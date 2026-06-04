@@ -1,194 +1,137 @@
-// sketch.js — UI principale p5.js (100% compatible)
-let audioCtx;
-let audioBuffer = null;
-let audioSource = null;
-let audioStartTime = 0;
-let audioDuration = 0;
-let isPlaying = false;
+// ------------------------------------------------------------
+// sketch.js — version propre, complète, cohérente
+// ------------------------------------------------------------
 
 let loopViewer;
 let midiViewer;
 let controls;
 
-let bpm = 120;
-let settingsVisible = false;
-let midiFileData = null;
+let fileInput;        // WAV/MP3 loader
+let midiFile;         // MIDI file loader
+let midiInputDevice;  // MIDI IN externe (plus tard)
+
+let audioBuffer = null;
+let audioSource = null;
+
+let audioDuration = 0;
+
+
+let midiEvents = [];
 let midiDuration = 0;
 let isPlayingMidi = false;
 let midiStartTime = 0;
 
-function playMidi() {
-  if (!audioCtx || !midiDuration) return;
+let audioCtx = null;
+let startTime = 0;
+let pausedAt = 0;
+let isPlaying = false;
 
-  midiStartTime = audioCtx.currentTime;
-  isPlayingMidi = true;
+function playAudioLoop() {
+  if (!audioBuffer) return;
+
+  if (!audioCtx) audioCtx = new AudioContext();
+
+  // Stop ancienne source
+  if (audioSource) audioSource.stop();
+
+  audioSource = audioCtx.createBufferSource();
+  audioSource.buffer = audioBuffer;
+
+  const loopStartSec = loopViewer.loopStart * audioBuffer.duration;
+  const loopEndSec   = loopViewer.loopEnd   * audioBuffer.duration;
+
+  audioSource.loop = true;
+  audioSource.loopStart = loopStartSec;
+  audioSource.loopEnd   = loopEndSec;
+
+  audioSource.connect(audioCtx.destination);
+
+  startTime = audioCtx.currentTime - pausedAt;
+  audioSource.start(0, loopStartSec + pausedAt);
+
+  isPlaying = true;
 }
 
-function stopMidi() {
-  isPlayingMidi = false;
+function stopAudio() {
+  if (audioSource) audioSource.stop();
+  pausedAt = 0;
+  isPlaying = false;
 }
 
-
-function handleMidiFile(file) {
-  if (!file || !file.file) return;
-
-  const buffer = base64ToArrayBuffer(file.data.split(",")[1]);
-  parseMidi(buffer);
+function pauseAudio() {
+  if (!isPlaying) return;
+  pausedAt = getCurrentAudioTime() - loopViewer.loopStart * audioBuffer.duration;
+  stopAudio();
 }
 
-function base64ToArrayBuffer(base64) {
-  const binary = atob(base64);
-  const len = binary.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes.buffer;
+function getCurrentAudioTime() {
+  if (!isPlaying) return loopViewer.loopStart * audioBuffer.duration;
+  return audioCtx.currentTime - startTime;
 }
 
-function parseMidi(arrayBuffer) {
-  const midi = new MIDIFile(arrayBuffer);
-
-  const events = midi.getMidiEvents();
-  const tempo = midi.header.getTicksPerBeat();
-  const tracks = midi.tracks;
-
-  let parsed = [];
-  let maxTime = 0;
-
-  for (let e of events) {
-    if (e.type !== 8 && e.type !== 9 && e.type !== 11) continue; // note on/off/CC
-
-    const t = e.playTime / 1000; // ms → s
-    parsed.push({
-      time: t,
-      channel: e.channel
-    });
-
-    if (t > maxTime) maxTime = t;
-  }
-
-  midiDuration = maxTime;
-  midiViewer.setEvents(parsed, midiDuration);
-}
-
-// Données temporaires pour affichage (en attendant les vrais devices)
-let fakeMidiEvents = [
-  { time: 0, type: "NoteOn", value: 60 },
-  { time: 120, type: "NoteOff", value: 60 },
-  { time: 240, type: "CC", value: "7=100" }
-];
-
-let fakeWave = new Array(200).fill(0).map((_, i) =>
-  Math.sin(i * 0.15) * 0.6
-);
-
-let fileInput;
 
 function setup() {
-  createCanvas(900, 600);
+  createCanvas(1000, 700);
 
-  initMIDI();
+  // Viewers
+  loopViewer = new LoopViewer(20, 20, width - 40, 200);
+  midiViewer = new MidiViewer(20, 240, width - 40, 200);
+  controls = new Controls(20, 460);
 
-  loopViewer = new LoopViewer(0, 0, width, 200);
-  midiViewer = new MidiViewer(0, 200, width, 200);
-  controls = new Controls(0, 400, width, 200);
-
-  // Input fichier audio (invisible)
+  // WAV/MP3 file picker
   fileInput = createFileInput(handleAudioFile);
   fileInput.hide();
+
+  // MIDI file picker
+  midiFile = createFileInput(handleMidiFile);
+  midiFile.hide();
 }
 
 function draw() {
-  background(20);
+  background(15);
 
-  // update playhead
-  if (isPlaying && audioCtx && audioDuration > 0) {
-    const t = (audioCtx.currentTime - audioStartTime) % audioDuration;
-    const norm = t / audioDuration;
-    loopViewer.setPlayhead(norm);
+  // AUDIO playhead
+if (isPlaying && audioBuffer) {
+  const t = getCurrentAudioTime();
+
+  const loopStartSec = loopViewer.loopStart * audioBuffer.duration;
+  const loopEndSec   = loopViewer.loopEnd   * audioBuffer.duration;
+
+  let loopPos = t;
+
+  // Clamp AVANT la loop
+  if (loopPos < loopStartSec) {
+    loopPos = loopStartSec;
+    startTime = audioCtx.currentTime - loopPos;
+  }
+
+  // Clamp APRÈS la loop
+  if (loopPos > loopEndSec) {
+    loopPos = loopStartSec;
+    startTime = audioCtx.currentTime - loopPos;
+  }
+
+  // Normalisation
+  const norm = (loopPos - loopStartSec) / (loopEndSec - loopStartSec);
+  loopViewer.setPlayhead(norm);
+}
+
+
+
+  // MIDI playhead
+  if (isPlayingMidi && audioCtx && midiDuration > 0) {
+    const t = (audioCtx.currentTime - midiStartTime) % midiDuration;
+    midiViewer.setPlayhead(t / midiDuration);
   }
 
   loopViewer.draw();
   midiViewer.draw();
   controls.draw();
-  drawBPM();
-  drawSettingsWindow();
-  if (isPlayingMidi) {
-    const t = (audioCtx.currentTime - midiStartTime) % midiDuration;
-    midiViewer.setPlayhead(t / midiDuration);
-  }
-
 }
 
-/* ------------------------------------------
-   BPM
-------------------------------------------- */
-function drawBPM() {
-  fill(255);
-  textSize(20);
-  text("BPM : " + bpm, 20, 380);
-}
-
-/* ------------------------------------------
-   Fenêtre Paramètres
-------------------------------------------- */
-function drawSettingsWindow() {
-  if (!settingsVisible) return;
-
-  push();
-  fill(0, 200);
-  noStroke();
-  rect(50, 50, width - 100, height - 100, 10);
-
-  fill(255);
-  textSize(24);
-  text("Paramètres MIDI", 80, 100);
-
-  textSize(16);
-  let y = 160;
-
-  for (let key in midiConfig) {
-    text(`${key} : ${midiConfig[key]}`, 80, y);
-    y += 30;
-  }
-
-  pop();
-}
-
-/* ------------------------------------------
-   INPUTS
-------------------------------------------- */
-function keyPressed() {
-  if (key === 'R') triggerAction("record");
-  if (key === 'P') triggerAction("play");
-  if (key === 'U') triggerAction("undo");
-  if (key === 'C') triggerAction("clear");
-
-  if (key === '-') triggerAction("loopDown");
-  if (key === '+') triggerAction("loopUp");
-
-  if (key === 'S') triggerAction("settings");
-  if (key === ' ') {
-    if (isPlaying) stopLoop();
-    else playLoop();
-  }
-}
-
-
-function mousePressed() {
-  // Boutons TMP
-  controls.mousePressed();
-
-  // Viewer WAV = bouton
-  if (loopViewer.isHovered()) {
-    fileInput.elt.accept = ".wav,.mp3";
-    fileInput.elt.click();
-  }
-  if (midiViewer.isHovered()) {
-    midiInput.elt.accept = ".mid,.midi";
-    midiInput.elt.click();
-  }
-
-}
+// ------------------------------------------------------------
+// AUDIO : WAV / MP3
+// ------------------------------------------------------------
 
 function handleAudioFile(file) {
   if (!file || !file.file) return;
@@ -204,59 +147,196 @@ function handleAudioFile(file) {
       audioBuffer = decoded;
       audioDuration = decoded.duration;
 
-      // waveform downsamplée
+      // waveform downsample
       const raw = decoded.getChannelData(0);
       const samples = 400;
       const block = Math.floor(raw.length / samples);
       const wave = [];
-      for (let i = 0; i < samples; i++) {
-        wave.push(raw[i * block]);
-      }
-      loopViewer.updateWave(wave);
-    })
-    .catch(err => console.error("decodeAudioData:", err));
-}
-
-
-function decodeAudioBuffer(arrayBuffer) {
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
-
-  ctx.decodeAudioData(arrayBuffer)
-    .then(decoded => {
-      const raw = decoded.getChannelData(0);
-      const samples = 300; // résolution de la waveform
-      const block = Math.floor(raw.length / samples);
-      const wave = [];
-
-      for (let i = 0; i < samples; i++) {
-        wave.push(raw[i * block]);
-      }
+      for (let i = 0; i < samples; i++) wave.push(raw[i * block]);
 
       loopViewer.updateWave(wave);
-    })
-    .catch(err => console.error("Erreur decodeAudioData:", err));
+    });
 }
 
-function playLoop() {
-  if (!audioBuffer || !audioCtx) return;
 
-  stopLoop();
+// ------------------------------------------------------------
+// MIDI FILE
+// ------------------------------------------------------------
+function handleMidiFile(file) {
+  if (!file || !file.file) return;
 
-  audioSource = audioCtx.createBufferSource();
-  audioSource.buffer = audioBuffer;
-  audioSource.loop = true;
-  audioSource.connect(audioCtx.destination);
-  audioSource.start();
+  const reader = new FileReader();
 
-  audioStartTime = audioCtx.currentTime;
-  isPlaying = true;
+  reader.onload = (e) => {
+    const arrayBuffer = e.target.result;
+    parseMidiFile(arrayBuffer);
+  };
+
+  reader.readAsArrayBuffer(file.file);
 }
 
-function stopLoop() {
-  if (audioSource) {
-    try { audioSource.stop(); } catch(e) {}
-    audioSource.disconnect();
-    audioSource = null;
+
+function base64ToArrayBuffer(base64) {
+  const binary = atob(base64);
+  const len = binary.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
+function parseMidiFile(arrayBuffer) {
+  const midi = new MIDIFile(arrayBuffer);
+
+  const instrumentNames = extractInstrumentNames(midi);
+  const events = midi.getMidiEvents();
+
+  // canal → liste d'événements MUSICAUX
+  const channels = {};
+
+  let maxTime = 0;
+
+  for (let e of events) {
+
+    // On ne garde QUE les événements musicaux
+    const musical =
+      e.type === 8 ||   // NoteOff
+      e.type === 9 ||   // NoteOn
+      e.type === 11;    // CC
+
+    if (!musical) continue;
+
+    // Certains meta-events ont un "channel" fantôme → on ignore
+    if (typeof e.channel !== "number") continue;
+    if (e.channel < 0 || e.channel > 15) continue;
+
+    const t = e.playTime / 1000;
+
+    if (!channels[e.channel]) channels[e.channel] = [];
+
+    channels[e.channel].push({
+      time: t,
+      channel: e.channel
+    });
+
+    if (t > maxTime) maxTime = t;
   }
-  isPlaying = false;
+
+  // Aplatir en une seule liste
+  let parsed = [];
+  for (let ch in channels) {
+    parsed.push(...channels[ch]);
+  }
+
+  midiViewer.setEvents(parsed, maxTime, instrumentNames);
+}
+
+
+
+function playMidiFile() {
+  if (!audioCtx || !midiDuration) return;
+
+  midiStartTime = audioCtx.currentTime;
+  isPlayingMidi = true;
+}
+
+function stopMidiFile() {
+  isPlayingMidi = false;
+}
+
+function extractInstrumentNames(midi) {
+  const names = {};
+  const decoder = new TextDecoder();
+
+  for (let t = 0; t < midi.tracks.length; t++) {
+    const events = midi.getTrackEvents(t);
+
+    for (let e of events) {
+      if (e.type === MIDIFile.EVENT_META &&
+          e.subtype === MIDIFile.EVENT_META_INSTRUMENT_NAME) {
+
+        const name = decoder.decode(e.data || new Uint8Array());
+        if (typeof e.channel === "number") {
+          names[e.channel] = name;
+        }
+      }
+    }
+  }
+
+  return names;
+}
+
+// ------------------------------------------------------------
+// INTERACTIONS
+// ------------------------------------------------------------
+
+function keyPressed() {
+  if (key === ' ') {
+    if (isPlaying) {
+      pauseAudio();   // ou stopAudio() si tu veux stop net
+    } else {
+      playAudioLoop();
+    }
+  }
+
+  if (key === 'M') {
+    if (isPlayingMidi) stopMidiFile();
+    else playMidiFile();
+  }
+}
+
+// ------------------------------------------------------------
+// INTERACTIONS SOURIS — VERSION PRO
+// ------------------------------------------------------------
+
+function mousePressed() {
+
+  // --- LOOP VIEWER ---
+  if (loopViewer.isHovered()) {
+
+    // Double‑clic → ouvrir fichier audio
+    loopViewer.onClick(() => {
+      fileInput.elt.accept = ".wav,.mp3";
+      fileInput.elt.click();
+    });
+
+    // Drag des loop handles
+    loopViewer.mousePressed();
+  }
+
+  // --- MIDI VIEWER ---
+  if (midiViewer.isHovered()) {
+
+    // Double‑clic → ouvrir fichier MIDI
+    midiViewer.onClick(() => {
+      midiFile.elt.accept = ".mid,.midi";
+      midiFile.elt.click();
+    });
+
+    // (Pas de drag dans midiViewer pour l’instant)
+  }
+}
+
+function mouseReleased() {
+  loopViewer.mouseReleased();
+  // midiViewer n’a pas de drag pour l’instant
+}
+
+function mouseDragged() {
+  loopViewer.mouseDragged();
+  // midiViewer n’a pas de drag pour l’instant
+}
+
+function mouseWheel(event) {
+
+  // --- ZOOM LOOP VIEWER ---
+  if (loopViewer.isHovered()) {
+    loopViewer.onWheel(event.deltaY);
+    return false; // empêche le scroll de la page
+  }
+
+  // --- ZOOM MIDI VIEWER ---
+  if (midiViewer.isHovered()) {
+    midiViewer.onWheel(event.deltaY);
+    return false;
+  }
 }
