@@ -1,0 +1,147 @@
+// controls.js — layout et labels comme le TMP
+
+class Controls {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+
+    const W = 150;
+    const H = 60;
+    const GAP_X = 10;
+    const GAP_Y = 20;
+
+    this.buttons = [
+      // Ligne du haut
+      {
+        id: "loopUp",
+        label1: "LOOP VOL",
+        label2: "UP",
+        x: 0,
+        y: 0,
+        w: W,
+        h: H,
+        action: () => triggerAction("loopUp")
+      },
+      {
+        id: "undo",
+        label1: "UNDO",
+        label2: "",
+        x: W + GAP_X,
+        y: 0,
+        w: W,
+        h: H,
+        action: () => triggerAction("undo")
+      },
+      {
+        id: "half",
+        label1: "1/2 SPEED",
+        label2: "",
+        x: 2 * (W + GAP_X),
+        y: 0,
+        w: W,
+        h: H,
+        action: () => triggerAction("half")
+      },
+      {
+        id: "reverse",
+        label1: "REVERSE",
+        label2: "",
+        x: 3 * (W + GAP_X),
+        y: 0,
+        w: W,
+        h: H,
+        action: () => triggerAction("reverse")
+      },
+
+      // Ligne du bas
+      {
+        id: "loopDown",
+        label1: "LOOP VOL",
+        label2: "DOWN",
+        x: 0,
+        y: H + GAP_Y,
+        w: W,
+        h: H,
+        action: () => triggerAction("loopDown")
+      },
+      {
+        id: "record",
+        label1: "RECORD",
+        label2: "OVERDUB",
+        x: W + GAP_X,
+        y: H + GAP_Y,
+        w: W,
+        h: H,
+        action: () => triggerAction("record")
+      },
+      {
+        id: "play",
+        label1: "PLAY",
+        label2: "STOP",
+        x: 2 * (W + GAP_X),
+        y: H + GAP_Y,
+        w: W,
+        h: H,
+        action: () => triggerAction("play")
+      },
+      {
+        id: "oneshot",
+        label1: "1-SHOT",
+        label2: "",
+        x: 3 * (W + GAP_X),
+        y: H + GAP_Y,
+        w: W,
+        h: H,
+        action: () => triggerAction("oneshot")
+      }
+    ];
+  }
+
+  draw() {
+    push();
+    translate(this.x, this.y);
+
+    for (let b of this.buttons) {
+      const hovered = this.isHovered(b);
+
+      // Fond
+      stroke(200);
+      strokeWeight(2);
+      fill(hovered ? 80 : 40);
+      rect(b.x, b.y, b.w, b.h, 6);
+
+      // Texte
+      noStroke();
+      fill(255);
+      textAlign(CENTER, CENTER);
+
+      if (b.label2 && b.label2 !== "") {
+        textSize(14);
+        text(b.label1, b.x + b.w / 2, b.y + b.h / 2 - 8);
+        text(b.label2, b.x + b.w / 2, b.y + b.h / 2 + 8);
+      } else {
+        textSize(16);
+        text(b.label1, b.x + b.w / 2, b.y + b.h / 2);
+      }
+    }
+
+    pop();
+  }
+
+  isHovered(b) {
+    return (
+      mouseX > this.x + b.x &&
+      mouseX < this.x + b.x + b.w &&
+      mouseY > this.y + b.y &&
+      mouseY < this.y + b.y + b.h
+    );
+  }
+
+  mousePressed() {
+    for (let b of this.buttons) {
+      if (this.isHovered(b)) {
+        b.action();
+      }
+    }
+  }
+}
