@@ -111,16 +111,21 @@ function draw() {
   settings.draw();
 
   // Fin d'enregistrement automatique (timing basé sur audioCtx)
-  if (recRecording && audioCtx) {
-    if (audioCtx.currentTime >= recRecordEndTime) {
-      // envoyer message de fin d'enregistrement au TMP (toggle)
-      midi.looperRecord(); // TMP uses same CC to toggle record/dub
-      recRecording = false;
-      // restore viewers active
-      midiViewer.setActive(true);
-      loopViewer.setActive(true);
-    }
+if (recRecording && audioCtx) {
+  if (audioCtx.currentTime >= recRecordEndTime) {
+
+    // 1) STOP looper TMP
+    midi.looperPlayStop(); // CC 104
+
+    // 2) Fin d’enregistrement interne
+    recRecording = false;
+
+    // 3) Réactiver les viewers
+    midiViewer.setActive(true);
+    loopViewer.setActive(true);
   }
+}
+
 
   // IMPORTANT : draw countdown overlay LAST so it's on top of UI
   if (isRecCountdown) {
@@ -285,43 +290,80 @@ function startRecSequence() {
 // triggerAction : relie les boutons Controls à des actions
 // ------------------------------------------------------------
 function triggerAction(id) {
+
+  // --- MODE TMP DIRECT : aucun fichier audio chargé ---
+  const noAudio = !audioBuffer;
+
+  if (noAudio) {
+    switch (id) {
+      case "record":
+        midi.looperRecord();   // CC 103
+        return;
+
+      case "play":
+        midi.looperPlayStop(); // CC 104
+        return;
+
+      case "undo":
+        midi.sendCC(105, 127); // ou CC réel si différent
+        return;
+
+      case "clear":
+        midi.sendCC(106, 127); // ou CC réel si différent
+        return;
+
+      case "loopUp":
+        midi.sendCC(7, 100);   // Master Volume + (à adapter)
+        return;
+
+      case "loopDown":
+        midi.sendCC(7, 40);    // Master Volume - (à adapter)
+        return;
+
+      case "settings":
+        settings.show();
+        return;
+    }
+  }
+
+  // --- MODE NORMAL : audio chargé ---
   switch (id) {
     case "record":
       startRecSequence();
       break;
+
     case "play":
-      // toggle play on active source
       if (loopViewer.active) {
         if (isPlaying) pauseAudio();
         else playAudioLoop();
       } else if (midiViewer.active) {
         if (isPlayingMidi) stopMidiFile();
         else playMidiFile();
-      } else {
-        // fallback: toggle audio
-        if (isPlaying) pauseAudio();
-        else playAudioLoop();
       }
       break;
+
     case "undo":
       console.log("undo action");
       break;
+
     case "clear":
       console.log("clear action");
       break;
+
     case "loopUp":
       console.log("loopUp");
       break;
+
     case "loopDown":
       console.log("loopDown");
       break;
+
     case "settings":
       settings.show();
       break;
-    default:
-      console.log("action:", id);
   }
 }
+
 
 // ------------------------------------------------------------
 // AUDIO
