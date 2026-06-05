@@ -1,8 +1,5 @@
 // ------------------------------------------------------------
-// midiViewer.js — VERSION PRO
-// Zoom centré sur la souris, offset dynamique,
-// double‑clic pour ouvrir un fichier MIDI,
-// noms d’instruments si présents, aucun canal vide
+// midiViewer.js — VERSION PRO + assombrissement
 // ------------------------------------------------------------
 
 class MidiViewer {
@@ -22,12 +19,10 @@ class MidiViewer {
     this.zoom = 1;
     this.offset = 0;
 
-    this.lastClickTime = 0; // double‑clic
+    this.lastClickTime = 0;
+    this.bpm = 120;
   }
 
-  // ------------------------------------------------------------
-  // Détection souris
-  // ------------------------------------------------------------
   isHovered() {
     return (
       mouseX > this.x &&
@@ -37,9 +32,6 @@ class MidiViewer {
     );
   }
 
-  // ------------------------------------------------------------
-  // Double‑clic pour ouvrir un fichier MIDI
-  // ------------------------------------------------------------
   onClick(callbackOpenFile) {
     const now = millis();
     if (now - this.lastClickTime < 250) {
@@ -48,9 +40,6 @@ class MidiViewer {
     this.lastClickTime = now;
   }
 
-  // ------------------------------------------------------------
-  // Injection des événements + noms d’instruments
-  // ------------------------------------------------------------
   setEvents(events, duration, instrumentNames = {}) {
     this.events = events;
     this.duration = duration;
@@ -66,9 +55,6 @@ class MidiViewer {
     this.channels = Array.from(map.keys()).sort();
   }
 
-  // ------------------------------------------------------------
-  // Zoom PRO centré sur la souris
-  // ------------------------------------------------------------
   onWheel(delta) {
     const zoomSpeed = 0.001;
     const localX = mouseX - this.x;
@@ -87,21 +73,14 @@ class MidiViewer {
     this.offset = constrain(this.offset, 0, maxOffset);
   }
 
-  // ------------------------------------------------------------
-  // Mise à jour du curseur
-  // ------------------------------------------------------------
   setPlayhead(normPos) {
     this.playhead = constrain(normPos, 0, 1);
   }
 
-  // ------------------------------------------------------------
-  // Rendu
-  // ------------------------------------------------------------
   draw() {
     push();
     translate(this.x, this.y);
 
-    // Fond
     fill(25);
     noStroke();
     rect(0, 0, this.w, this.h);
@@ -116,7 +95,6 @@ class MidiViewer {
 
     const rowH = this.h / this.channels.length;
 
-    // Palette 16 canaux
     const colors = [
       color(255, 80, 80),
       color(80, 255, 80),
@@ -136,17 +114,14 @@ class MidiViewer {
       color(255, 255, 150)
     ];
 
-    // Lignes par canal
     for (let i = 0; i < this.channels.length; i++) {
       const ch = this.channels[i];
       const y = i * rowH;
 
-      // Fond de ligne
       fill(35);
       noStroke();
       rect(0, y, this.w, rowH);
 
-      // Événements du canal
       stroke(colors[ch]);
       strokeWeight(3);
 
@@ -161,7 +136,6 @@ class MidiViewer {
         line(x, y + 5, x, y + rowH - 5);
       }
 
-      // Label canal ou nom d’instrument
       const label = this.instrumentNames[ch] || ("CH " + ch);
 
       fill(200);
@@ -171,7 +145,6 @@ class MidiViewer {
       text(label, 5, y + 5);
     }
 
-    // Curseur de lecture
     const cx = this.playhead * this.w * this.zoom - this.offset;
     stroke(255, 200, 0);
     strokeWeight(2);
