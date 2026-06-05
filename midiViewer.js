@@ -1,5 +1,6 @@
 // ------------------------------------------------------------
-// midiViewer.js — VERSION PRO + assombrissement
+// midiViewer.js — VERSION PRO + assombrissement (corrigé)
+// Ajout : bordure et label ACTIVE quand actif
 // ------------------------------------------------------------
 
 class MidiViewer {
@@ -21,9 +22,17 @@ class MidiViewer {
 
     this.lastClickTime = 0;
     this.bpm = 120;
+
+    // active flag for dimming / blocking interactions
+    this.active = true;
+  }
+
+  setActive(v) {
+    this.active = !!v;
   }
 
   isHovered() {
+    if (!this.active) return false;
     return (
       mouseX > this.x &&
       mouseX < this.x + this.w &&
@@ -56,6 +65,7 @@ class MidiViewer {
   }
 
   onWheel(delta) {
+    if (!this.active) return;
     const zoomSpeed = 0.001;
     const localX = mouseX - this.x;
 
@@ -85,10 +95,33 @@ class MidiViewer {
     noStroke();
     rect(0, 0, this.w, this.h);
 
+    // bordure active/inactive
+    if (this.active) {
+      stroke(255, 200, 0);
+      strokeWeight(2);
+      noFill();
+      rect(-2, -2, this.w + 4, this.h + 4, 6);
+      noStroke();
+      fill(255, 200, 0);
+      textSize(12);
+      textAlign(LEFT, TOP);
+      text("ACTIVE", 6, 6);
+    } else {
+      stroke(60);
+      strokeWeight(1);
+      noFill();
+      rect(-2, -2, this.w + 4, this.h + 4, 6);
+    }
+
     if (this.channels.length === 0) {
       fill(150);
       textAlign(CENTER, CENTER);
       text("Double‑clic pour charger un fichier MIDI", this.w/2, this.h/2);
+      // dim overlay if inactive
+      if (!this.active) {
+        fill(0, 150);
+        rect(0, 0, this.w, this.h);
+      }
       pop();
       return;
     }
@@ -149,6 +182,13 @@ class MidiViewer {
     stroke(255, 200, 0);
     strokeWeight(2);
     line(cx, 0, cx, this.h);
+
+    // dim overlay if inactive
+    if (!this.active) {
+      fill(0, 150);
+      noStroke();
+      rect(0, 0, this.w, this.h);
+    }
 
     pop();
   }

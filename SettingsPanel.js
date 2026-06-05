@@ -1,5 +1,6 @@
 // ------------------------------------------------------------
 // SettingsPanel.js — version finale propre, alignée, CC éditables
+// (corrigé : isolation graphique dans _monitor pour éviter fuite de styles)
 // ------------------------------------------------------------
 
 class SettingsPanel {
@@ -108,7 +109,7 @@ class SettingsPanel {
     cy += 30;
 
     text("Synth — MIDI OUT", cx, cy);
-    this.synthOutIndex = this._selector(cx + 200, cy, this.midi.outputs);
+    this.synthOutIndex = this._selector(cx + 200, cy, this.synthOutIndex, this.midi.outputs);
     cy += 45;
 
     // ------------------------------------------------------------
@@ -152,9 +153,15 @@ class SettingsPanel {
     fill(255);
     noStroke();
     textSize(16);
+    textAlign(LEFT, TOP);
+
+    // Monitoring IN
+    fill(255); // ensure label color is white
     text("Monitoring IN", zoneX + 10, zoneY + 10);
     this._monitor(this.midi.log, zoneX + 10, zoneY + 30, monW, monH);
 
+    // Monitoring OUT
+    fill(255); // reset to white before drawing the second label
     text("Monitoring OUT", zoneX + 20 + monW, zoneY + 10);
     this._monitor(this.midi.logOut, zoneX + 20 + monW, zoneY + 30, monW, monH);
 
@@ -235,6 +242,9 @@ class SettingsPanel {
   // MONITOR
   // ------------------------------------------------------------
   _monitor(log, x, y, w, h) {
+    // isolate styles so _monitor doesn't change global fill/stroke/text settings
+    push();
+
     fill(15);
     stroke(90);
     rect(x, y, w, h, 6);
@@ -245,10 +255,15 @@ class SettingsPanel {
     textAlign(LEFT, TOP);
 
     let yy = y + 4;
-    if (!log) return;
+    if (!log) {
+      pop();
+      return;
+    }
     for (let i = log.length - 1; i >= 0 && yy < y + h - 10; i--) {
       text(log[i], x + 4, yy);
       yy += 11;
     }
+
+    pop();
   }
 }
