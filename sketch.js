@@ -26,6 +26,76 @@ let startTime = 0;
 let pausedAt = 0;
 let isPlaying = false;
 
+// triggerAction : sendMidi=true quand déclenchée par l'UI, false quand reçue du hardware (anti-boucle)
+function triggerAction(action, sendMidi = true) {
+  const cfg = midiConfig[action];
+  if (!cfg) return;
+
+  if (sendMidi) {
+    const parts = cfg.split(" ");
+    if (parts[0] === "CC") {
+      sendCC("tmp", 1, parseInt(parts[1]), parseInt(parts[2]));
+    }
+  }
+
+  // Flash visuel sur le bouton correspondant (UI → hardware ET hardware → UI)
+  if (controls) controls.flash(action);
+
+  // Mémorise la dernière action pour l'affichage
+  lastAction      = action;
+  lastActionTime  = millis();
+  lastActionFrom  = sendMidi ? "UI" : "TMP";
+
+  console.log("Action:", action, sendMidi ? "→ TMP" : "← reçu du hardware");
+}
+
+let lastAction     = "";
+let lastActionTime = -9999;
+let lastActionFrom = "";
+
+function drawMidiStatus() {
+  const connected = midiReady && devices.tmp.output;
+  push();
+  noStroke();
+  textAlign(LEFT, TOP);
+
+  // ── Bloc debug en haut à gauche ──────────────────────────────
+  fill(0, 180);
+  rect(0, 0, 420, 58, 0, 0, 6, 0);
+
+  const allOut = getMidiOutputNames();
+  const allIn  = getMidiInputNames();
+
+  textSize(11);
+  fill(midiReady ? color(80, 230, 100) : color(230, 80, 80));
+  text(midiReady ? "MIDI ✅" : "MIDI ❌  (pas d'accès)", 8, 6);
+
+  fill(180);
+  text(`OUT dispo: ${allOut.length ? allOut.join(" | ") : "aucun"}`, 8, 20);
+  text(`IN  dispo: ${allIn.length  ? allIn.join(" | ")  : "aucun"}`, 8, 33);
+
+  fill(connected ? color(80, 230, 100) : color(230, 180, 50));
+  text(`TMP sélectionné: ${devices.tmp.outputName || "NON — ouvre ⚙ SETTINGS"}`, 8, 46);
+
+  // ── Pastille + dernière action (haut droite) ─────────────────
+  fill(connected ? color(50, 220, 80) : color(200, 50, 50));
+  ellipse(width - 24, 16, 12, 12);
+  textAlign(RIGHT, CENTER);
+  fill(180);
+  textSize(11);
+  text(connected ? `TMP: ${devices.tmp.outputName}` : "TMP: non connecté", width - 34, 16);
+
+  if (millis() - lastActionTime < 2000) {
+    const alpha = map(millis() - lastActionTime, 0, 2000, 255, 0);
+    fill(255, 200, 50, alpha);
+    textSize(13);
+    const arrow = lastActionFrom === "UI" ? "→ TMP" : "← TMP";
+    text(`${lastAction.toUpperCase()}  ${arrow}`, width - 34, 34);
+  }
+
+  pop();
+}
+
 function playAudioLoop() {
   if (!audioBuffer) return;
 
@@ -85,6 +155,12 @@ function setup() {
   // MIDI file picker
   midiFile = createFileInput(handleMidiFile);
   midiFile.hide();
+
+  // Settings UI (sélecteurs MIDI)
+  initSettingsUI();
+
+  // Init MIDI après le setup
+  initMIDI();
 }
 
 function draw() {
@@ -127,6 +203,8 @@ if (isPlaying && audioBuffer) {
   loopViewer.draw();
   midiViewer.draw();
   controls.draw();
+  drawMidiStatus();
+  drawSettings();
 }
 
 // ------------------------------------------------------------
@@ -314,6 +392,9 @@ function mousePressed() {
 
     // (Pas de drag dans midiViewer pour l’instant)
   }
+
+  // --- CONTROLS (boutons TMP + settings) ---
+  controls.mousePressed();
 }
 
 function mouseReleased() {

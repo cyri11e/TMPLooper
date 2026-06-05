@@ -2,12 +2,14 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
+  <style>
+    body { margin: 0; padding: 0; background: #000; overflow: hidden; }
+  </style>
 
   <!-- p5.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
 
-  <!-- WebMidi.js -->
-  <script src="https://cdn.jsdelivr.net/npm/webmidi@3.0.0/dist/webmidi.iife.js"></script>
+  <!-- WebMidi.js supprimé : on utilise l'API native navigator.requestMIDIAccess -->
   <script src="https://cdn.jsdelivr.net/gh/nfroidure/MIDIFile/dist/MIDIFile.js"></script>
 
   <!-- Tes modules -->
