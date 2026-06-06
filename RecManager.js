@@ -26,6 +26,7 @@ class RecManager {
 
     let loopDuration = 0;
 
+    // MODE AUDIO NORMAL
     if (ui.loopViewer.active && audio.buffer) {
       loopDuration =
         (ui.loopViewer.loopEnd - ui.loopViewer.loopStart) *
@@ -35,19 +36,20 @@ class RecManager {
       loopDuration = ui.midiViewer.duration;
     }
 
-    // MODE FANTOM : pas d'audio chargé → durée = BPM × mesures
+    // MODE FANTOM : pas d'audio chargé
     this.fantomMode = !audio.buffer;
 
-    if (this.fantomMode) {
-      const bpm = this.app.midi.clockBpm || this.app.ui.bpmControls.bpm;
-      const measures = this.app.ui.bpmControls.measures;
-      loopDuration = (60 / bpm) * measures;
-    }
+
+      const bpm = this.app.midi.clockBpm || ui.bpmControls.bpm;
+      const measures = ui.bpmControls.measures;
+      loopDuration = (60 / bpm) * measures * 4; // on considère que 1 mesure = 4 temps
+
 
     if (loopDuration <= 0.01) return;
 
+    // Intervalle du countdown
     if (this.fantomMode) {
-      const bpm = this.app.midi.clockBpm || this.app.ui.bpmControls.bpm;
+      const bpm = this.app.midi.clockBpm || ui.bpmControls.bpm;
       this.beatIntervalMs = 60000 / bpm;
     } else {
       this.beatIntervalMs = (loopDuration / this.beats) * 1000;
@@ -111,10 +113,11 @@ class RecManager {
 
     audio._ensureCtx();
 
+    // TMP REC
     this.app.midi.looperRecord();
     this.app.tmp.setState("REC");
 
-    // Fantom START en mode Fantom
+    // Fantom START
     if (this.fantomMode) {
       this.app.midi.sendStart();
     }
@@ -125,14 +128,14 @@ class RecManager {
     let loopDuration = 0;
 
     if (this.fantomMode) {
-      const bpm = this.app.midi.clockBpm || this.app.ui.bpmControls.bpm;
-      const measures = this.app.ui.bpmControls.measures;
-      loopDuration = (60 / bpm) * measures;
+      const bpm = this.app.midi.clockBpm || ui.bpmControls.bpm;
+      const measures = ui.bpmControls.measures;
+      loopDuration = (60 / bpm) * measures * 4; // on considère que 1 mesure = 4 temps
     }
     else if (ui.loopViewer.active && audio.buffer) {
       loopDuration =
         (ui.loopViewer.loopEnd - ui.loopViewer.loopStart) *
-        audio.buffer.duration;
+        audio.buffer.duration * measures;
     }
     else if (ui.midiViewer.active) {
       loopDuration = ui.midiViewer.duration;
@@ -140,7 +143,7 @@ class RecManager {
 
     this.recordEndTime = this.recordStartTime + loopDuration;
 
-    // En mode Fantom : pas d'audio à jouer
+    // Audio loop uniquement en mode audio
     if (!this.fantomMode && audio.buffer) {
       audio.playLoop();
     }
@@ -151,11 +154,11 @@ class RecManager {
   drawCountdown() {
     if (!this.isCountdown && !this.isRecording) return;
 
-    // Overlay pour countdown ou progression
     push();
     fill(0, 220);
     rect(0, 0, width, height);
 
+    // COUNTDOWN
     if (this.isCountdown) {
       const elapsed = millis() - this.countdownStart;
       const beatIndex = floor(elapsed / this.beatIntervalMs);
@@ -177,7 +180,7 @@ class RecManager {
       }
     }
 
-    // Barre de progression pendant l'enregistrement (divisée en mesures)
+    // BARRE DE PROGRESSION
     if (this.isRecording) {
       const audio = this.app.audio;
       if (audio.ctx) {

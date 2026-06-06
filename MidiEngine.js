@@ -51,51 +51,70 @@ class MidiEngine {
   // ------------------------------------------------------------
   // TRANSPORT FANTOM
   // ------------------------------------------------------------
-  sendStart() {
-    if (!this.tmpOutput) return;
-    this.tmpOutput.send([0xFA]);
-  }
+sendStart() {
+    const out = this.fantomOutput;
+    if (!out) {
+        this._log("⚠ Aucun port Fantom détecté");
+        return;
+    }
+    out.send([0xFA]);
+    this._log("→ Fantom START");
+}
+
+
 
   sendStop() {
     if (!this.tmpOutput) return;
     this.tmpOutput.send([0xFC]);
+    this._log("→ Fantom STOP");
   }
 
   sendContinue() {
     if (!this.tmpOutput) return;
     this.tmpOutput.send([0xFB]);
+    this._log("→ Fantom CONTINUE");
   }
 
   // ------------------------------------------------------------
   // SCAN PORTS
   // ------------------------------------------------------------
-  _scanPorts() {
+_scanPorts() {
     this.inputs = [];
     this.outputs = [];
     this.tmpOutput = null;
+    this.fantomOutput = null;
 
     // INPUTS
     for (let input of this.midi.inputs.values()) {
-      this.inputs.push(input);
-      input.onmidimessage = (msg) => this._handle(msg, input);
+        this.inputs.push(input);
+        input.onmidimessage = (msg) => this._handle(msg, input);
     }
 
     // OUTPUTS
-    for (let output of this.midi.outputs.values()) {
-      this.outputs.push(output);
+    for (let o of this.midi.outputs.values()) {
 
-      if (!this.tmpOutput && /tone master/i.test(output.name)) {
-        this.tmpOutput = output;
-        this._log("Tone Master Pro détecté");
-      }
+        this.outputs.push(o);
+
+        // Tone Master Pro
+        if (!this.tmpOutput && /tone master/i.test(o.name)) {
+            this.tmpOutput = o;
+            this._log("Tone Master Pro détecté");
+        }
+
+        // Fantom
+        if (!this.fantomOutput && /fantom/i.test(o.name)) {
+            this.fantomOutput = o;
+            this._log("Fantom détecté : " + o.name);
+        }
     }
 
-    // fallback
+    // fallback TMP
     if (!this.tmpOutput && this.outputs.length > 0) {
-      this.tmpOutput = this.outputs[0];
-      this._log("TMP non trouvé → OUT par défaut utilisé");
+        this.tmpOutput = this.outputs[0];
+        this._log("TMP non trouvé → OUT par défaut utilisé");
     }
-  }
+}
+
 
   // ------------------------------------------------------------
   // HANDLE MIDI IN
