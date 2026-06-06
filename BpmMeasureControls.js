@@ -1,3 +1,8 @@
+// ------------------------------------------------------------
+// BpmMeasureControls.js — BPM + Mesures
+// BPM Fantom si audio inactif, BPM manuel sinon
+// ------------------------------------------------------------
+
 class BpmMeasureControls {
   constructor(app, x, y) {
     this.app = app;
@@ -20,6 +25,12 @@ class BpmMeasureControls {
     textAlign(LEFT, CENTER);
     text("BPM", 0, 0);
 
+    // BPM à afficher : Fantom si audio OFF et clock dispo, sinon manuel
+    const bpmToShow =
+      (!this.app.audio.isPlaying && this.app.midi.clockBpm)
+        ? this.app.midi.clockBpm
+        : this.bpm;
+
     // BPM INPUT BOX
     const bpmBox = { x: 40, y: -10, w: 70, h: 22 };
     stroke(200);
@@ -29,7 +40,7 @@ class BpmMeasureControls {
     fill(255);
     noStroke();
     textAlign(CENTER, CENTER);
-    text(nf(this.bpm, 0, 2), bpmBox.x + bpmBox.w / 2, bpmBox.y + bpmBox.h / 2);
+    text(nf(bpmToShow, 0, 2), bpmBox.x + bpmBox.w / 2, bpmBox.y + bpmBox.h / 2);
 
     // BPM - / +
     this._btn(120, -10, 22, 22, "-", () => this._changeBpm(-0.10));
@@ -88,7 +99,12 @@ class BpmMeasureControls {
       mouseY > this.y - 10 &&
       mouseY < this.y + 12
     ) {
-      this.activeField = "bpm";
+      // si BPM Fantom actif et audio OFF → pas de saisie manuelle
+      if (!this.app.audio.isPlaying && this.app.midi.clockBpm) {
+        this.activeField = null;
+      } else {
+        this.activeField = "bpm";
+      }
     } else {
       this.activeField = null;
     }

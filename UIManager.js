@@ -1,6 +1,6 @@
 // ------------------------------------------------------------
 // UIManager.js — coordination de toute l’interface p5.js
-// LoopViewer, MidiViewer, Controls, SettingsPanel
+// LoopViewer, MidiViewer, Controls, SettingsPanel, BPM/Mesures
 // ------------------------------------------------------------
 
 class UIManager {
@@ -10,12 +10,15 @@ class UIManager {
     // UI components
     this.loopViewer = new LoopViewer(20, 20, width - 40, 200);
     this.midiViewer = new MidiViewer(20, 240, width - 40, 200);
-    this.bpmControls = new BpmMeasureControls(app, 160, 660);
 
-    // IMPORTANT : on passe app à Controls
+    // Controls TMP
     this.controls = new Controls(20, 460, this.app);
 
+    // Settings
     this.settings = new SettingsPanel(app.midi);
+
+    // BPM / Mesures (à droite de Paramétrage)
+    this.bpmControls = new BpmMeasureControls(app, 160, 660);
 
     // état initial
     this.loopViewer.setActive(true);
@@ -53,13 +56,17 @@ class UIManager {
     this.loopViewer.draw();
     this.midiViewer.draw();
     this.controls.draw();
+
+    // BPM / Mesures AVANT settings
     this.bpmControls.draw();
+
+    // Settings au-dessus de tout
     this.settings.draw();
   }
 
   _updateMidiPlayhead() {
     const audio = this.app.audio;
-    const mv    = this.midiViewer;
+    const mv = this.midiViewer;
 
     if (!mv.active) return;
     if (!audio.ctx) return;
@@ -113,58 +120,57 @@ class UIManager {
   // ------------------------------------------------------------
   // INTERACTIONS
   // ------------------------------------------------------------
-mousePressed() {
+  mousePressed() {
 
-  // 1) BPM / Mesures d'abord
-  this.bpmControls.mousePressed();
+    // 1) BPM / Mesures d'abord
+    this.bpmControls.mousePressed();
 
-  // Si le champ BPM est actif → on ne laisse rien d'autre intercepter le clic
-  if (this.bpmControls.activeField) return;
+    // Si le champ BPM est actif → on ne laisse rien d'autre intercepter le clic
+    if (this.bpmControls.activeField) return;
 
-  // 2) Settings
-  if (this.settings.visible) {
-    if (
-      mouseX > this.settings.closeX &&
-      mouseX < this.settings.closeX + this.settings.closeW &&
-      mouseY > this.settings.closeY &&
-      mouseY < this.settings.closeY + this.settings.closeH
-    ) {
-      this.settings.hide();
+    // 2) Settings
+    if (this.settings.visible) {
+      if (
+        mouseX > this.settings.closeX &&
+        mouseX < this.settings.closeX + this.settings.closeW &&
+        mouseY > this.settings.closeY &&
+        mouseY < this.settings.closeY + this.settings.closeH
+      ) {
+        this.settings.hide();
+        return;
+      }
       return;
     }
-    return;
+
+    // 3) Boutons TMP
+    this.controls.mousePressed();
+
+    // 4) LoopViewer
+    if (this.loopViewer.isHovered()) {
+      this.loopViewer.setActive(true);
+      this.midiViewer.setActive(false);
+
+      this.loopViewer.onClick(() => {
+        this.audioInput.elt.accept = ".wav,.mp3";
+        this.audioInput.elt.click();
+      });
+
+      this.loopViewer.mousePressed();
+      return;
+    }
+
+    // 5) MidiViewer
+    if (this.midiViewer.isHovered()) {
+      this.midiViewer.setActive(true);
+      this.loopViewer.setActive(false);
+
+      this.midiViewer.onClick(() => {
+        this.midiInput.elt.accept = ".mid,.midi";
+        this.midiInput.elt.click();
+      });
+      return;
+    }
   }
-
-  // 3) Boutons TMP
-  this.controls.mousePressed();
-
-  // 4) LoopViewer
-  if (this.loopViewer.isHovered()) {
-    this.loopViewer.setActive(true);
-    this.midiViewer.setActive(false);
-
-    this.loopViewer.onClick(() => {
-      this.audioInput.elt.accept = ".wav,.mp3";
-      this.audioInput.elt.click();
-    });
-
-    this.loopViewer.mousePressed();
-    return;
-  }
-
-  // 5) MidiViewer
-  if (this.midiViewer.isHovered()) {
-    this.midiViewer.setActive(true);
-    this.loopViewer.setActive(false);
-
-    this.midiViewer.onClick(() => {
-      this.midiInput.elt.accept = ".mid,.midi";
-      this.midiInput.elt.click();
-    });
-    return;
-  }
-}
-
 
   mouseReleased() {
     if (!this.settings.visible) this.loopViewer.mouseReleased();
@@ -187,14 +193,13 @@ mousePressed() {
     }
   }
 
+  keyPressed(k) {
 
-    keyPressed(k) {
+    // 1) BPM / Mesures
+    this.bpmControls.keyPressed(k);
 
-  // 1) BPM / Mesures
-  this.bpmControls.keyPressed(k);
-
-  // Si on est en saisie BPM → on bloque tout le reste
-  if (this.bpmControls.activeField) return;
+    // Si on est en saisie BPM → on bloque tout le reste
+    if (this.bpmControls.activeField) return;
 
     if (this.settings.visible) {
       if (this.settings.activeField) {

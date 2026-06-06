@@ -1,6 +1,6 @@
 // ------------------------------------------------------------
 // MidiEngine.js — moteur MIDI autonome
-// Web MIDI natif + helpers Tone Master Pro
+// Web MIDI natif + helpers Tone Master Pro + BPM Fantom lissé
 // ------------------------------------------------------------
 
 class MidiEngine {
@@ -20,6 +20,14 @@ class MidiEngine {
     this.onCC = null;
     this.onPC = null;
     this.onAny = null;
+
+    // BPM via MIDI Clock (Fantom)
+    this.clockTimes = [];
+    this.clockBpm = null;
+
+    // Lissage BPM Fantom (fenêtre glissante)
+    this.smoothWindowMs = 1000; // 2 secondes
+    this.bpmHistory = [];
   }
 
   // ------------------------------------------------------------
@@ -39,6 +47,20 @@ class MidiEngine {
       this._log("MIDI ports rescannés");
     };
   }
+sendStart() {
+  if (!this.tmpOutput) return;
+  this.tmpOutput.send([0xFA]);
+}
+
+sendStop() {
+  if (!this.tmpOutput) return;
+  this.tmpOutput.send([0xFC]);
+}
+
+sendContinue() {
+  if (!this.tmpOutput) return;
+  this.tmpOutput.send([0xFB]);
+}
 
   // ------------------------------------------------------------
   // SCAN PORTS
@@ -80,10 +102,42 @@ class MidiEngine {
     const ch = status & 0x0F;
 
     // ------------------------------------------------------------
-    // FILTRES ANTI-SPAM
+    // FILTRES / CLOCK / TRANSPORT
     // ------------------------------------------------------------
     if (status === 0xFE) return; // Active Sensing
-    if (status === 0xF8) return; // MIDI Clock
+
+    // MIDI CLOCK → BPM Fantom lissé
+    if (status === 0xF8) {
+      const now = performance.now();
+
+      // 1) timestamps pour BPM brut
+      this.clockTimes.push(now);
+      if (this.clockTimes.length > 24) this.clockTimes.shift();
+
+      if (this.clockTimes.length >= 2) {
+        let intervals = [];
+        for (let i = 1; i < this.clockTimes.length; i++) {
+          intervals.push(this.clockTimes[i] - this.clockTimes[i - 1]);
+        }
+
+        const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+        const bpmRaw = 60000 / avg / 24;
+
+        // 2) historique pour lissage
+        this.bpmHistory.push({ t: now, bpm: bpmRaw });
+
+        // 3) purge des valeurs trop anciennes
+        const cutoff = now - this.smoothWindowMs;
+        this.bpmHistory = this.bpmHistory.filter(e => e.t >= cutoff);
+
+        // 4) BPM lissé = moyenne des BPM récents
+        const sum = this.bpmHistory.reduce((a, e) => a + e.bpm, 0);
+        this.clockBpm = sum / this.bpmHistory.length;
+      }
+
+      return; // on ne log pas le clock
+    }
+
     if (status === 0xFA || status === 0xFB || status === 0xFC) return; // transport
     if (/AG06/i.test(input.name)) return; // Yamaha AG06
 
@@ -95,7 +149,7 @@ class MidiEngine {
     else if (type === 0x80 || (type === 0x90 && d2 === 0)) label = "NoteOff";
     else label = "0x" + type.toString(16);
 
-    this._log(`${input.name} | ch${ch+1} | ${label} ${d1} ${type!==0xC0?"v"+d2:""}`);
+    this._log(`${input.name} | ch${ch + 1} | ${label} ${d1} ${type !== 0xC0 ? "v" + d2 : ""}`);
 
     // callbacks
     if (this.onAny) this.onAny({ status, d1, d2, type, ch });
@@ -114,7 +168,7 @@ class MidiEngine {
   }
 
   // ------------------------------------------------------------
-  // OVERLAY (appelé depuis UIManager)
+  // OVERLAY (appelé depuis AppController)
   // ------------------------------------------------------------
   drawOverlay() {
     const x = width - 380;
@@ -125,7 +179,7 @@ class MidiEngine {
     const lh = 12;
     const pad = 6;
     const w = 360;
-    const h = pad*2 + lh * lines.length;
+    const h = pad * 2 + lh * lines.length;
 
     translate(x, y);
     noStroke();
@@ -197,6 +251,6 @@ class MidiEngine {
 
   toggleFX(cc, on, ch = 0) {
     this.sendCC(cc, on ? 127 : 0, ch);
-    this._log(`→ TMP FX CC${cc} = ${on?"ON":"OFF"}`);
+    this._log(`→ TMP FX CC${cc} = ${on ? "ON" : "OFF"}`);
   }
 }
