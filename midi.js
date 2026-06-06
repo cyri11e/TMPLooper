@@ -65,6 +65,24 @@ class MidiManager {
     const type = status & 0xF0;
     const ch = status & 0x0F;
 
+
+    // ------------------------------------------------------------
+// FILTRE ANTI-SPAM (Yamaha AG06, Active Sensing, Clock…)
+// ------------------------------------------------------------
+
+// 1) Active Sensing (0xFE) → spam toutes les 300ms
+if (status === 0xFE) return;
+
+// 2) MIDI Clock (0xF8) → 24 fois par beat
+if (status === 0xF8) return;
+
+// 3) Start / Continue / Stop transport
+if (status === 0xFA || status === 0xFB || status === 0xFC) return;
+
+// 4) Filtrer TOUT ce qui vient du Yamaha AG06
+if (/AG06/i.test(input.name)) return;
+
+
     let label = "";
     if (type === 0xB0) label = "CC";
     else if (type === 0xC0) label = "PC";
