@@ -16,6 +16,8 @@ class RecManager {
     this.recordEndTime = 0;
 
     this.scheduledClicks = [];
+
+    this.fantomMode = false;
   }
 
   startRecSequence() {
@@ -33,9 +35,23 @@ class RecManager {
       loopDuration = ui.midiViewer.duration;
     }
 
+    // MODE FANTOM : pas d'audio chargé → durée = BPM × mesures
+    this.fantomMode = !audio.buffer;
+
+    if (this.fantomMode) {
+      const bpm = this.app.midi.clockBpm || this.app.ui.bpmControls.bpm;
+      const measures = this.app.ui.bpmControls.measures;
+      loopDuration = (60 / bpm) * measures;
+    }
+
     if (loopDuration <= 0.01) return;
 
-    this.beatIntervalMs = (loopDuration / this.beats) * 1000;
+    if (this.fantomMode) {
+      const bpm = this.app.midi.clockBpm || this.app.ui.bpmControls.bpm;
+      this.beatIntervalMs = 60000 / bpm;
+    } else {
+      this.beatIntervalMs = (loopDuration / this.beats) * 1000;
+    }
 
     this.countdownStart = millis();
     this.isCountdown = true;
@@ -98,51 +114,102 @@ class RecManager {
     this.app.midi.looperRecord();
     this.app.tmp.setState("REC");
 
+    // Fantom START en mode Fantom
+    if (this.fantomMode) {
+      this.app.midi.sendStart();
+    }
+
     this.isRecording = true;
     this.recordStartTime = audio.ctx.currentTime;
 
     let loopDuration = 0;
-    if (ui.loopViewer.active && audio.buffer) {
+
+    if (this.fantomMode) {
+      const bpm = this.app.midi.clockBpm || this.app.ui.bpmControls.bpm;
+      const measures = this.app.ui.bpmControls.measures;
+      loopDuration = (60 / bpm) * measures;
+    }
+    else if (ui.loopViewer.active && audio.buffer) {
       loopDuration =
         (ui.loopViewer.loopEnd - ui.loopViewer.loopStart) *
         audio.buffer.duration;
-    } else if (ui.midiViewer.active) {
+    }
+    else if (ui.midiViewer.active) {
       loopDuration = ui.midiViewer.duration;
     }
 
     this.recordEndTime = this.recordStartTime + loopDuration;
 
-    audio.playLoop();
+    // En mode Fantom : pas d'audio à jouer
+    if (!this.fantomMode && audio.buffer) {
+      audio.playLoop();
+    }
 
     this.scheduledClicks = [];
   }
 
   drawCountdown() {
-    if (!this.isCountdown) return;
+    if (!this.isCountdown && !this.isRecording) return;
 
-    const elapsed = millis() - this.countdownStart;
-    const beatIndex = floor(elapsed / this.beatIntervalMs);
-    const displayBeat = constrain(beatIndex, 0, this.beats - 1);
-
+    // Overlay pour countdown ou progression
     push();
     fill(0, 220);
     rect(0, 0, width, height);
 
-    fill(255);
-    textAlign(CENTER, CENTER);
-    textSize(min(width, height) * 0.28);
-    text(String(displayBeat + 1), width / 2, height / 2);
+    if (this.isCountdown) {
+      const elapsed = millis() - this.countdownStart;
+      const beatIndex = floor(elapsed / this.beatIntervalMs);
+      const displayBeat = constrain(beatIndex, 0, this.beats - 1);
 
-    textSize(18);
-    textAlign(CENTER, BOTTOM);
-    const bpmApprox = 60 / (this.beatIntervalMs / 1000);
-    text(`BPM ≈ ${nf(bpmApprox, 0, 1)}`, width / 2, height - 40);
-    pop();
+      fill(255);
+      textAlign(CENTER, CENTER);
+      textSize(min(width, height) * 0.28);
+      text(String(displayBeat + 1), width / 2, height / 2);
 
-    if (elapsed >= this.beatIntervalMs * this.beats) {
-      this.isCountdown = false;
-      this._startRecording();
+      textSize(18);
+      textAlign(CENTER, BOTTOM);
+      const bpmApprox = 60 / (this.beatIntervalMs / 1000);
+      text(`BPM ≈ ${nf(bpmApprox, 0, 1)}`, width / 2, height - 40);
+
+      if (elapsed >= this.beatIntervalMs * this.beats) {
+        this.isCountdown = false;
+        this._startRecording();
+      }
     }
+
+    // Barre de progression pendant l'enregistrement (divisée en mesures)
+    if (this.isRecording) {
+      const audio = this.app.audio;
+      if (audio.ctx) {
+        const now = audio.ctx.currentTime;
+        const total = this.recordEndTime - this.recordStartTime;
+        const progress = total > 0 ? constrain((now - this.recordStartTime) / total, 0, 1) : 0;
+
+        const measures = this.app.ui.bpmControls.measures || 1;
+        const barWidth = width * 0.8;
+        const barHeight = 20;
+        const barX = width * 0.1;
+        const barY = height * 0.8;
+
+        stroke(255);
+        noFill();
+        rect(barX, barY, barWidth, barHeight);
+
+        const segmentWidth = barWidth / measures;
+        for (let i = 0; i < measures; i++) {
+          const segX = barX + i * segmentWidth;
+          stroke(150);
+          line(segX, barY, segX, barY + barHeight);
+        }
+
+        const filledWidth = barWidth * progress;
+        noStroke();
+        fill(0, 200, 0);
+        rect(barX, barY, filledWidth, barHeight);
+      }
+    }
+
+    pop();
 
     this._checkAutoStop();
   }
@@ -163,7 +230,9 @@ class RecManager {
       this.app.ui.midiViewer.setActive(true);
       this.app.ui.loopViewer.setActive(true);
 
-      audio.playLoop();
+      if (!this.fantomMode && audio.buffer) {
+        audio.playLoop();
+      }
     }
   }
 }

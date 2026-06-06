@@ -26,7 +26,7 @@ class MidiEngine {
     this.clockBpm = null;
 
     // Lissage BPM Fantom (fenêtre glissante)
-    this.smoothWindowMs = 1000; // 2 secondes
+    this.smoothWindowMs = 2000; // 2 secondes
     this.bpmHistory = [];
   }
 
@@ -47,20 +47,24 @@ class MidiEngine {
       this._log("MIDI ports rescannés");
     };
   }
-sendStart() {
-  if (!this.tmpOutput) return;
-  this.tmpOutput.send([0xFA]);
-}
 
-sendStop() {
-  if (!this.tmpOutput) return;
-  this.tmpOutput.send([0xFC]);
-}
+  // ------------------------------------------------------------
+  // TRANSPORT FANTOM
+  // ------------------------------------------------------------
+  sendStart() {
+    if (!this.tmpOutput) return;
+    this.tmpOutput.send([0xFA]);
+  }
 
-sendContinue() {
-  if (!this.tmpOutput) return;
-  this.tmpOutput.send([0xFB]);
-}
+  sendStop() {
+    if (!this.tmpOutput) return;
+    this.tmpOutput.send([0xFC]);
+  }
+
+  sendContinue() {
+    if (!this.tmpOutput) return;
+    this.tmpOutput.send([0xFB]);
+  }
 
   // ------------------------------------------------------------
   // SCAN PORTS

@@ -3,7 +3,7 @@ class AppController {
     this.audio = new AudioEngine(this);
     this.midi  = new MidiEngine(this);
     this.tmp   = new TMPController(this);
-    this.rec   = new RecManager(this);
+    this.rec   = new RecManager(this);   // OK
     this.ui    = new UIManager(this);
 
     this.midiStartTime = 0;
@@ -17,11 +17,8 @@ class AppController {
     // UI
     this.ui.draw();
 
-    // COUNTDOWN
-    this.rec.drawCountdown();
-
-    // AUTO-STOP REC
-    this.rec._checkAutoStop();
+    // COUNTDOWN + PROGRESSION
+    this.rec.drawCountdown();   // OK
 
     // MONITOR MIDI
     this.midi.drawOverlay();
@@ -35,8 +32,16 @@ class AppController {
 
   triggerAction(id) {
     switch (id) {
-      case "record":   this.tmp.handleRecord();      break;
-      case "play":     this.tmp.handlePlayStop();    break;
+
+      case "record":
+        // 🔥 C’est ça qui manquait
+        this.rec.startRecSequence();
+        break;
+
+      case "play":
+        this.tmp.handlePlayStop();
+        break;
+
       case "undo":     this.midi.sendCC(102, 127);   break;
       case "loopUp":   this.midi.sendCC(109, 127);   break;
       case "loopDown": this.midi.sendCC(110, 127);   break;
