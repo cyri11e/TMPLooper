@@ -1,23 +1,43 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-
+  <meta charset="UTF-8" />
+  <title>TMP Looper + Audio Viewer</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #000;
+      color: #fff;
+      font-family: sans-serif;
+      overflow: hidden;
+    }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
   <!-- p5.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
 
-  <!-- WebMidi.js -->
-  <script src="https://cdn.jsdelivr.net/gh/nfroidure/MIDIFile/dist/MIDIFile.js"></script>
+  <!-- MIDIFile (pour parseMidi) -->
+  <script src="https://cdn.jsdelivr.net/npm/midifile@1.1.2/build/MIDIFile.js"></script>
 
-  <!-- Tes modules -->
-  <script src="midi.js"></script>
+  <!-- UI components -->
   <script src="loopViewer.js"></script>
   <script src="midiViewer.js"></script>
   <script src="controls.js"></script>
-  <script src="settings.js"></script>
   <script src="SettingsPanel.js"></script>
-  <script src="syncController.js"></script>
+
+  <!-- Engines / logique -->
+  <script src="AudioEngine.js"></script>
+  <script src="MidiEngine.js"></script>
+  <script src="TMPController.js"></script>
+  <script src="RecManager.js"></script>
+  <script src="UIManager.js"></script>
+  <script src="AppController.js"></script>
+  <script src="BpmMeasureControls.js"></script>
+
+  <!-- sketch p5 -->
   <script src="sketch.js"></script>
-</head>
-<body></body>
+</body>
 </html>
