@@ -7,31 +7,45 @@ class UIManager {
   constructor(app) {
     this.app = app;
 
-    // UI components
-    this.loopViewer = new LoopViewer(20, 20, width - 40, 200);
-    this.midiViewer = new MidiViewer(20, 240, width - 40, 200);
-
-    // Controls TMP
-    this.controls = new Controls(20, 460, this.app);
-
-    // Settings
-    this.settings = new SettingsPanel(app.midi);
-
-    // BPM / Mesures (à droite de Paramétrage)
+    // ------------------------------------------------------------
+    // 1) BPM / Mesures (doit exister AVANT LoopViewer)
+    // ------------------------------------------------------------
     this.bpmControls = new BpmMeasureControls(app, 160, 660);
 
-    // état initial
+    // ------------------------------------------------------------
+    // 2) Viewers
+    // ------------------------------------------------------------
+    this.loopViewer = new LoopViewer(20, 20, width - 40, 200, this.bpmControls);
+    this.midiViewer = new MidiViewer(20, 240, width - 40, 200);
+
+    // ------------------------------------------------------------
+    // 3) Controls TMP
+    // ------------------------------------------------------------
+    this.controls = new Controls(20, 460, this.app);
+
+    // ------------------------------------------------------------
+    // 4) Settings
+    // ------------------------------------------------------------
+    this.settings = new SettingsPanel(app.midi);
+
+    // ------------------------------------------------------------
+    // 5) États initiaux
+    // ------------------------------------------------------------
     this.loopViewer.setActive(true);
     this.midiViewer.setActive(true);
 
-    // file inputs
+    // ------------------------------------------------------------
+    // 6) File inputs
+    // ------------------------------------------------------------
     this.audioInput = createFileInput((file) => this._handleAudioFile(file));
     this.audioInput.hide();
 
     this.midiInput = createFileInput((file) => this._handleMidiFile(file));
     this.midiInput.hide();
 
-    // bouton paramétrage
+    // ------------------------------------------------------------
+    // 7) Bouton paramétrage
+    // ------------------------------------------------------------
     this.controls.settingsBtn.action = () => this.toggleSettings();
   }
 
