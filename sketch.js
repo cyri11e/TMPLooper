@@ -26,5 +26,7 @@ function mouseWheel(e)   { if (app) return app.mouseWheel(e); }
 
 function keyPressed() {
   if (!app) return;
-  app.keyPressed(key);
+  app.keyPressed(key, keyCode);
+
+
 }

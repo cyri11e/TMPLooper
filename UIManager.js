@@ -207,7 +207,11 @@ class UIManager {
     }
   }
 
-  keyPressed(k) {
+  // ------------------------------------------------------------
+  // CLAVIER
+  // ------------------------------------------------------------
+  // ⚠️ Appelée depuis sketch.js : app.keyPressed(key, keyCode)
+  keyPressed(k, code) {
 
     // 1) BPM / Mesures
     this.bpmControls.keyPressed(k);
@@ -215,6 +219,7 @@ class UIManager {
     // Si on est en saisie BPM → on bloque tout le reste
     if (this.bpmControls.activeField) return;
 
+    // 2) Settings
     if (this.settings.visible) {
       if (this.settings.activeField) {
         if (k >= "0" && k <= "9") {
@@ -230,11 +235,17 @@ class UIManager {
       return;
     }
 
-    // SPACE = pré-écoute audio
+    // 3) SPACE = pré-écoute audio
     if (k === " ") {
       if (this.app.audio.isPlaying) this.app.audio.pause();
       else this.app.audio.playLoop();
       return;
+    }
+
+    // 4) Flèches → délégation au LoopViewerInteraction
+    if (this.loopViewer && this.loopViewer.interaction) {
+      // on passe le keyCode (RIGHT_ARROW, LEFT_ARROW, etc.)
+      this.loopViewer.interaction.keyPressed(code);
     }
   }
 }
