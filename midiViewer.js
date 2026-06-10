@@ -1,6 +1,5 @@
 // ------------------------------------------------------------
-// midiViewer.js — VERSION PRO + assombrissement (corrigé)
-// Ajout : bordure et label ACTIVE quand actif
+// MidiViewer.js — coordination (équivalent LoopViewer.js pour le MIDI)
 // ------------------------------------------------------------
 
 class MidiViewer {
@@ -10,23 +9,38 @@ class MidiViewer {
     this.w = w;
     this.h = h;
 
-    this.events = [];
-    this.channels = [];
-    this.instrumentNames = {};
-
-    this.duration = 1;
-    this.playhead = 0;
-
+    // état de vue
     this.zoom = 1;
     this.offset = 0;
 
-    this.lastClickTime = 0;
-    this.bpm = 120;
+    // loop en fraction [0..1]
+    this.loopStart = 0;
+    this.loopEnd = 1;
 
-    // active flag for dimming / blocking interactions
+    // playhead normalisé [0..1] dans la sélection
+    this.playhead = 0;
+
     this.active = true;
+
+    // données MIDI
+    this.events = [];
+    this.channels = [];
+    this.instrumentNames = {};
+    this.duration = 1;      // en secondes (max time des events)
+    this.filename = null;   // nom du fichier (rempli depuis UIManager)
+
+    // sous-modules
+    this.math = new MidiViewerMusicMath(this);
+    this.renderer = new MidiViewerRenderer(this);
+    this.interaction = new MidiViewerInteraction(this);
+
+    // double‑clic pour ouvrir fichier
+    this._lastClickTime = 0;
   }
 
+  // ------------------------------------------------------------
+  // état
+  // ------------------------------------------------------------
   setActive(v) {
     this.active = !!v;
   }
@@ -43,153 +57,81 @@ class MidiViewer {
 
   onClick(callbackOpenFile) {
     const now = millis();
-    if (now - this.lastClickTime < 250) {
+    if (now - this._lastClickTime < 250) {
       callbackOpenFile();
     }
-    this.lastClickTime = now;
+    this._lastClickTime = now;
   }
 
+  // ------------------------------------------------------------
+  // données MIDI
+  // ------------------------------------------------------------
   setEvents(events, duration, instrumentNames = {}) {
-    this.events = events;
-    this.duration = duration;
-    this.instrumentNames = instrumentNames;
+    this.events = events || [];
+    this.duration = duration || 1;
+    this.instrumentNames = instrumentNames || {};
 
     const map = new Map();
-
-    for (let e of events) {
+    for (let e of this.events) {
       if (!map.has(e.channel)) map.set(e.channel, 0);
       map.set(e.channel, map.get(e.channel) + 1);
     }
-
     this.channels = Array.from(map.keys()).sort();
+  }
+
+  // ------------------------------------------------------------
+  // BPM auto sur la sélection (même formule que LoopViewerMusicMath)
+//  (à appeler depuis l’extérieur si tu veux l’exploiter)
+// ------------------------------------------------------------
+  getAutoBpm(measures, beatsPerMeasure) {
+    return this.math.getAutoBpm(
+      this.loopStart,
+      this.loopEnd,
+      measures,
+      beatsPerMeasure,
+      this.duration
+    );
+  }
+
+  // ------------------------------------------------------------
+  // draw
+  // ------------------------------------------------------------
+  draw() {
+    this.renderer.draw();
+  }
+
+  // ------------------------------------------------------------
+  // interactions (si jamais tu les appelles via UIManager)
+//  UIManager appelle déjà this.midiViewer.interaction.* → OK aussi
+  // ------------------------------------------------------------
+  mousePressed() {
+    if (!this.active) return;
+    this.interaction.mousePressed();
+  }
+
+  mouseDragged() {
+    if (!this.active) return;
+    this.interaction.mouseDragged();
+  }
+
+  mouseReleased() {
+    if (!this.active) return;
+    this.interaction.mouseReleased();
   }
 
   onWheel(delta) {
     if (!this.active) return;
-    const zoomSpeed = 0.001;
-    const localX = mouseX - this.x;
-
-    const timeBefore = (localX + this.offset) / (this.w * this.zoom);
-
-    this.zoom *= (1 - delta * zoomSpeed);
-    this.zoom = constrain(this.zoom, 0.2, 20);
-
-    const timeAfter = (localX + this.offset) / (this.w * this.zoom);
-
-    const deltaTime = timeAfter - timeBefore;
-    this.offset += deltaTime * this.w * this.zoom;
-
-    const maxOffset = this.w * this.zoom - this.w;
-    this.offset = constrain(this.offset, 0, maxOffset);
+    this.interaction.onWheel(delta);
   }
 
-  setPlayhead(normPos) {
-    this.playhead = constrain(normPos, 0, 1);
-  }
-
-  draw() {
-    push();
-    translate(this.x, this.y);
-
-    fill(25);
-    noStroke();
-    rect(0, 0, this.w, this.h);
-
-    // bordure active/inactive
-    if (this.active) {
-      stroke(255, 200, 0);
-      strokeWeight(2);
-      noFill();
-      rect(-2, -2, this.w + 4, this.h + 4, 6);
-      noStroke();
-      fill(255, 200, 0);
-      textSize(12);
-      textAlign(LEFT, TOP);
-      text("ACTIVE", 6, 6);
-    } else {
-      stroke(60);
-      strokeWeight(1);
-      noFill();
-      rect(-2, -2, this.w + 4, this.h + 4, 6);
-    }
-
-    if (this.channels.length === 0) {
-      fill(150);
-      textAlign(CENTER, CENTER);
-      text("Double‑clic pour charger un fichier MIDI", this.w/2, this.h/2);
-      // dim overlay if inactive
-      if (!this.active) {
-        fill(0, 150);
-        rect(0, 0, this.w, this.h);
-      }
-      pop();
-      return;
-    }
-
-    const rowH = this.h / this.channels.length;
-
-    const colors = [
-      color(255, 80, 80),
-      color(80, 255, 80),
-      color(80, 80, 255),
-      color(255, 200, 80),
-      color(255, 80, 200),
-      color(80, 255, 200),
-      color(200, 80, 255),
-      color(200, 200, 80),
-      color(80, 200, 200),
-      color(200, 80, 80),
-      color(80, 80, 200),
-      color(200, 200, 200),
-      color(150, 150, 255),
-      color(255, 150, 150),
-      color(150, 255, 150),
-      color(255, 255, 150)
-    ];
-
-    for (let i = 0; i < this.channels.length; i++) {
-      const ch = this.channels[i];
-      const y = i * rowH;
-
-      fill(35);
-      noStroke();
-      rect(0, y, this.w, rowH);
-
-      stroke(colors[ch]);
-      strokeWeight(3);
-
-      for (let e of this.events) {
-        if (e.channel !== ch) continue;
-
-        const t = e.time / this.duration;
-        const x = t * this.w * this.zoom - this.offset;
-
-        if (x < -10 || x > this.w + 10) continue;
-
-        line(x, y + 5, x, y + rowH - 5);
-      }
-
-      const label = this.instrumentNames[ch] || ("CH " + ch);
-
-      fill(200);
-      noStroke();
-      textSize(12);
-      textAlign(LEFT, TOP);
-      text(label, 5, y + 5);
-    }
-
-    const cx = this.playhead * this.w * this.zoom - this.offset;
-    stroke(255, 200, 0);
-    strokeWeight(2);
-    line(cx, 0, cx, this.h);
-
-    // dim overlay if inactive
-    if (!this.active) {
-      fill(0, 150);
-      noStroke();
-      rect(0, 0, this.w, this.h);
-    }
-
-    pop();
+  // ------------------------------------------------------------
+  // playhead externe (si tu veux le synchroniser à l’audio)
+//  time = secondes absolues dans le fichier MIDI
+  // ------------------------------------------------------------
+  setPlayhead(time) {
+    const tNorm = this.duration > 0 ? time / this.duration : 0;
+    const span = this.loopEnd - this.loopStart || 1;
+    const local = (tNorm - this.loopStart) / span;
+    this.playhead = constrain(local, 0, 1);
   }
 }

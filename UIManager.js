@@ -79,15 +79,16 @@ class UIManager {
   }
 
   _updateMidiPlayhead() {
-    const audio = this.app.audio;
-    const mv = this.midiViewer;
+    // const mv = this.midiViewer;
+    // if (!mv.active) return;
+    // if (!mv.duration) return;
 
-    if (!mv.active) return;
-    if (!audio.ctx) return;
-    if (!mv.duration) return;
+    // // avance le playhead dans la boucle
+    // const now = millis() / 1000;
+    // const span = mv.loopEnd - mv.loopStart;
 
-    const t = (audio.ctx.currentTime - (this.app.midiStartTime || 0)) % mv.duration;
-    mv.setPlayhead(t / mv.duration);
+    // const local = ((now % span) + mv.loopStart);
+    // mv.setPlayhead(local);
   }
 
   // ------------------------------------------------------------
@@ -182,16 +183,28 @@ class UIManager {
         this.midiInput.elt.accept = ".mid,.midi";
         this.midiInput.elt.click();
       });
+
+      // IMPORTANT : déléguer au MidiViewerInteraction
+      this.midiViewer.interaction.mousePressed();
       return;
     }
   }
 
   mouseReleased() {
-    if (!this.settings.visible) this.loopViewer.mouseReleased();
+    if (!this.settings.visible) {
+      this.loopViewer.mouseReleased();
+      // IMPORTANT : relâcher aussi le MidiViewerInteraction
+      this.midiViewer.interaction.mouseReleased();
+    }
   }
 
   mouseDragged() {
-    if (!this.settings.visible) this.loopViewer.mouseDragged();
+    if (!this.settings.visible) {
+      this.loopViewer.mouseDragged();
+      if (this.midiViewer.active) {
+        this.midiViewer.interaction.mouseDragged();
+      }
+    }
   }
 
   mouseWheel(e) {
@@ -210,7 +223,7 @@ class UIManager {
   // ------------------------------------------------------------
   // CLAVIER
   // ------------------------------------------------------------
-  // ⚠️ Appelée depuis sketch.js : app.keyPressed(key, keyCode)
+  // Appelée depuis sketch.js : app.keyPressed(key, keyCode)
   keyPressed(k, code) {
 
     // 1) BPM / Mesures
@@ -244,7 +257,6 @@ class UIManager {
 
     // 4) Flèches → délégation au LoopViewerInteraction
     if (this.loopViewer && this.loopViewer.interaction) {
-      // on passe le keyCode (RIGHT_ARROW, LEFT_ARROW, etc.)
       this.loopViewer.interaction.keyPressed(code);
     }
   }
