@@ -77,6 +77,12 @@ class LoopViewer {
 
     // recalcul BPM auto sur la sélection courante
     this.updateAutoBpm();
+
+    this.analyzer = new AudioAnalyzer(
+        this.rawChannelData,
+        this.rawBuffer.sampleRate
+    );
+
   }
 
   // ------------------------------------------------------------

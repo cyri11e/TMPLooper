@@ -1,13 +1,14 @@
 // ------------------------------------------------------------
-// LoopViewerInteraction.js — gestion souris / zoom / drag / pan
-// Version stable, complète, sans régression
+// LoopViewerInteraction.js — version finale
+// - Poignée réelle prioritaire
+// - Poignée de snap = hitbox stricte (12x24)
+// - Pan toujours fonctionnel
 // ------------------------------------------------------------
 
 class LoopViewerInteraction {
     constructor(viewer) {
         this.v = viewer;
 
-        // états de drag
         this.dragging = false;
         this.dragLeft = false;
         this.dragRight = false;
@@ -19,51 +20,91 @@ class LoopViewerInteraction {
         this.selEnd = 0;
     }
 
-    // ------------------------------------------------------------
-    // MOUSE PRESSED
-    // ------------------------------------------------------------
     mousePressed() {
         const v = this.v;
         if (!v.active) return;
         if (!v.isHovered()) return;
 
         const localX = mouseX - v.x;
+        const localY = mouseY - v.y;
         this.lastX = mouseX;
 
         const leftX  = v.loopStart * v.w * v.zoom - v.offset;
         const rightX = v.loopEnd   * v.w * v.zoom - v.offset;
 
-        // poignée gauche
+        // --------------------------------------------------------
+        // 1) POIGNÉES RÉELLES (PRIORITAIRES)
+        // --------------------------------------------------------
         if (abs(localX - leftX) < 12) {
             this.dragLeft = true;
             this.dragging = true;
             return;
         }
 
-        // poignée droite
         if (abs(localX - rightX) < 12) {
             this.dragRight = true;
             this.dragging = true;
             return;
         }
 
-        // clic dans la sélection → déplacer la sélection
-        if (localX > leftX && localX < rightX) {
-            this.dragSelection = true;
-            this.dragging = true;
-            this.selStart = v.loopStart;
-            this.selEnd   = v.loopEnd;
+        // --------------------------------------------------------
+        // 2) POIGNÉES DE SNAP (hitbox stricte 12x24)
+        // --------------------------------------------------------
+        const snapW = 12;
+        const snapH = 24;
+        const snapY = v.h/2 - snapH/2;
+
+        // poignée snap gauche
+        if (localX >= 0 && localX <= snapW &&
+            localY >= snapY && localY <= snapY + snapH) {
+
+            const visibleStart = v.offset / (v.w * v.zoom);
+            const visibleEnd   = (v.offset + v.w) / (v.w * v.zoom);
+
+            v.loopStart = constrain(visibleStart, 0, 1);
+            v.loopEnd   = constrain(visibleEnd,   0, 1);
             return;
         }
 
-        // sinon → PAN
+        // poignée snap droite
+        if (localX >= v.w - snapW && localX <= v.w &&
+            localY >= snapY && localY <= snapY + snapH) {
+
+            const visibleStart = v.offset / (v.w * v.zoom);
+            const visibleEnd   = (v.offset + v.w) / (v.w * v.zoom);
+
+            v.loopStart = constrain(visibleStart, 0, 1);
+            v.loopEnd   = constrain(visibleEnd,   0, 1);
+            return;
+        }
+
+        // --------------------------------------------------------
+        // 3) CLIC DANS LA SÉLECTION
+        // --------------------------------------------------------
+        if (localX > leftX && localX < rightX) {
+
+            // SHIFT = déplacer la sélection
+            if (keyIsDown(SHIFT)) {
+                this.dragSelection = true;
+                this.dragging = true;
+                this.selStart = v.loopStart;
+                this.selEnd   = v.loopEnd;
+                return;
+            }
+
+            // Sinon = PAN
+            this.dragPan = true;
+            this.dragging = true;
+            return;
+        }
+
+        // --------------------------------------------------------
+        // 4) Sinon → PAN
+        // --------------------------------------------------------
         this.dragPan = true;
         this.dragging = true;
     }
 
-    // ------------------------------------------------------------
-    // MOUSE DRAGGED
-    // ------------------------------------------------------------
     mouseDragged() {
         const v = this.v;
         if (!this.dragging) return;
@@ -82,7 +123,7 @@ class LoopViewerInteraction {
         if (this.dragLeft) {
             const t = (mouseX - v.x + v.offset) / (v.w * v.zoom);
             v.loopStart = constrain(t, 0, v.loopEnd - 0.001);
-            this._updateAutoBpm();
+            v.updateAutoBpm?.();
             return;
         }
 
@@ -90,11 +131,11 @@ class LoopViewerInteraction {
         if (this.dragRight) {
             const t = (mouseX - v.x + v.offset) / (v.w * v.zoom);
             v.loopEnd = constrain(t, v.loopStart + 0.001, 1);
-            this._updateAutoBpm();
+            v.updateAutoBpm?.();
             return;
         }
 
-        // déplacement de la sélection
+        // déplacement de la sélection (SHIFT)
         if (this.dragSelection) {
             const deltaNorm = dx / (v.w * v.zoom);
             let ns = this.selStart + deltaNorm;
@@ -108,13 +149,10 @@ class LoopViewerInteraction {
             v.loopStart = ns;
             v.loopEnd   = ne;
 
-            this._updateAutoBpm();
+            v.updateAutoBpm?.();
         }
     }
 
-    // ------------------------------------------------------------
-    // MOUSE RELEASED
-    // ------------------------------------------------------------
     mouseReleased() {
         this.dragging = false;
         this.dragLeft = false;
@@ -123,9 +161,6 @@ class LoopViewerInteraction {
         this.dragPan = false;
     }
 
-    // ------------------------------------------------------------
-    // WHEEL ZOOM (centré sur curseur)
-    // ------------------------------------------------------------
     onWheel(delta) {
         const v = this.v;
 
@@ -137,21 +172,5 @@ class LoopViewerInteraction {
 
         v.offset = timeBefore * v.w * v.zoom - localX;
         v.offset = constrain(v.offset, 0, v.w * v.zoom - v.w);
-    }
-
-    // ------------------------------------------------------------
-    // BPM AUTO
-    // ------------------------------------------------------------
-    _updateAutoBpm() {
-        const v = this.v;
-        if (!v.rawBuffer) return;
-
-        const selDur = (v.loopEnd - v.loopStart) * v.rawBuffer.duration;
-        if (selDur <= 0) return;
-
-        const beats = v.renderer.bpmControls.beatsPerMeasure;
-        const bpmAuto = 60 * beats / selDur;
-
-        v.renderer.bpmControls.bpm = Number(bpmAuto.toFixed(2));
     }
 }
