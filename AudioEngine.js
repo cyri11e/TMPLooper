@@ -110,6 +110,7 @@ class AudioEngine {
     return this.ctx.currentTime - this.startTime;
   }
 
+
   // ------------------------------------------------------------
   // UPDATE PLAYHEAD (appelé depuis UIManager)
   // ------------------------------------------------------------
@@ -118,6 +119,10 @@ class AudioEngine {
 
     const lv = this.app.ui.loopViewer;
     const t  = this.getCurrentTime();
+
+    // ⚠️ IMPORTANT : on lit ls/le APRÈS application éventuelle du pending-loop
+    lv.applyPendingLoopIfNeeded();
+
     const ls = lv.loopStart * this.buffer.duration;
     const le = lv.loopEnd   * this.buffer.duration;
 
@@ -129,11 +134,33 @@ class AudioEngine {
     }
 
     if (lp > le) {
-      lp = ls;
-      this.startTime = this.ctx.currentTime - lp;
+
+      // appliquer la sélection future
+      lv.applyPendingLoopIfNeeded();
+
+      // recalcul ls/le après update
+      const ls2 = lv.loopStart * this.buffer.duration;
+      const le2 = lv.loopEnd   * this.buffer.duration;
+
+      // recréer une nouvelle source WebAudio
+      try { this.source.stop(); } catch(e){}
+      this.source = this.ctx.createBufferSource();
+      this.source.buffer = this.buffer;
+      this.source.loop = true;
+      this.source.loopStart = ls2;
+      this.source.loopEnd   = le2;
+      this.source.connect(this.ctx.destination);
+
+      // redémarrer proprement
+      this.startTime = this.ctx.currentTime - ls2;
+      this.source.start(0, ls2);
+
+      lp = ls2;
     }
+
 
     const norm = (lp - ls) / (le - ls);
     lv.setPlayhead(norm);
   }
+
 }

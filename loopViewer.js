@@ -17,6 +17,10 @@ class LoopViewer {
     this.loopStart = 0;
     this.loopEnd = 1;
 
+    // *** NOUVEAU : sélection future (pending) ***
+    this.pendingLoopStart = null;
+    this.pendingLoopEnd   = null;
+
     // playhead normalisé [0..1] dans la sélection
     this.playhead = 0;
 
@@ -82,11 +86,10 @@ class LoopViewer {
         this.rawChannelData,
         this.rawBuffer.sampleRate
     );
-
   }
 
   // ------------------------------------------------------------
-  // BPM auto (public, utilisé par BpmMeasureControls + interaction)
+  // BPM auto
   // ------------------------------------------------------------
   updateAutoBpm() {
     if (!this.rawBuffer) return;
@@ -99,6 +102,23 @@ class LoopViewer {
 
     const bpmAuto = 60 * beats / selDur;
     this.renderer.bpmControls.bpm = Number(bpmAuto.toFixed(2));
+  }
+
+  // ------------------------------------------------------------
+  // *** NOUVEAU : appliquer la sélection future ***
+  // appelé depuis AudioEngine.updatePlayhead()
+  // ------------------------------------------------------------
+  applyPendingLoopIfNeeded() {
+    if (this.pendingLoopStart !== null) {
+      this.loopStart = this.pendingLoopStart;
+      this.loopEnd   = this.pendingLoopEnd;
+
+      this.pendingLoopStart = null;
+      this.pendingLoopEnd   = null;
+
+      // recalcul BPM
+      this.updateAutoBpm();
+    }
   }
 
   // ------------------------------------------------------------
