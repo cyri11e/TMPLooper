@@ -42,26 +42,48 @@ class LoopViewerInteraction {
 
     _moveSelectionToBeat(targetBeat) {
         const v = this.v;
+        const beats = v.analyzer.beatMarkers;
+
+        // 1) Durée actuelle de la sélection
         const span = v.loopEnd - v.loopStart;
 
-        // snap si proche
-        if (Math.abs(v.loopStart - targetBeat) < 0.002) {
-            // deuxième appui → déplacement d’un beat complet
-            v.loopStart = targetBeat;
-            v.loopEnd   = targetBeat + span;
-        } else {
-            // premier appui → snap
-            v.loopStart = targetBeat;
-            v.loopEnd   = targetBeat + span;
+        // 2) Nouveau début = beat détecté
+        const start = targetBeat;
+
+        // 3) Position théorique de fin
+        const theoreticalEnd = start + span;
+
+        // 4) Trouver le beat détecté le plus proche de theoreticalEnd
+        let end = beats[0];
+        let bestDist = Math.abs(beats[0] - theoreticalEnd);
+
+        for (const b of beats) {
+            const d = Math.abs(b - theoreticalEnd);
+            if (d < bestDist) {
+                bestDist = d;
+                end = b;
+            }
         }
 
-        // clamp
-        if (v.loopEnd > 1) {
-            const diff = v.loopEnd - 1;
-            v.loopEnd = 1;
-            v.loopStart -= diff;
+        // 5) Appliquer
+        v.loopStart = start;
+        v.loopEnd   = end;
+
+        // 6) Recentrer la vue si la sélection sort de l'écran
+        const visibleStart = v.offset / (v.w * v.zoom);
+        const visibleEnd   = (v.offset + v.w) / (v.w * v.zoom);
+
+        if (v.loopStart < visibleStart) {
+            v.offset = v.loopStart * v.w * v.zoom;
+        } else if (v.loopEnd > visibleEnd) {
+            v.offset = v.loopEnd * v.w * v.zoom - v.w;
         }
+
+        // 7) Mettre à jour le BPM auto
+        if (v.updateAutoBpm) v.updateAutoBpm();
     }
+
+
 
     // ------------------------------------------------------------
     // CLAVIER
@@ -79,6 +101,8 @@ class LoopViewerInteraction {
         if (keyCode === RIGHT_ARROW) {
             const next = this._findNextBeat(pos, beats);
             this._moveSelectionToBeat(next);
+            if (v.updateAutoBpm) v.updateAutoBpm();
+
             return;
         }
 
@@ -86,6 +110,8 @@ class LoopViewerInteraction {
         if (keyCode === LEFT_ARROW) {
             const prev = this._findPrevBeat(pos, beats);
             this._moveSelectionToBeat(prev);
+            if (v.updateAutoBpm) v.updateAutoBpm();
+
             return;
         }
 
@@ -99,6 +125,8 @@ class LoopViewerInteraction {
             }
 
             this._moveSelectionToBeat(target);
+            if (v.updateAutoBpm) v.updateAutoBpm();
+
             return;
         }
 
@@ -112,6 +140,8 @@ class LoopViewerInteraction {
             }
 
             this._moveSelectionToBeat(target);
+            if (v.updateAutoBpm) v.updateAutoBpm();
+
             return;
         }
     }
@@ -227,6 +257,8 @@ class LoopViewerInteraction {
             //if (v.analyzer) t = v.analyzer.snapToBeat(t);
 
             v.loopStart = constrain(t, 0, v.loopEnd - 0.001);
+            if (v.updateAutoBpm) v.updateAutoBpm();
+
             return;
         }
 
@@ -238,6 +270,8 @@ class LoopViewerInteraction {
             // if (v.analyzer) t = v.analyzer.snapToBeat(t);
 
             v.loopEnd = constrain(t, v.loopStart + 0.001, 1);
+            if (v.updateAutoBpm) v.updateAutoBpm();
+
             return;
         }
 
