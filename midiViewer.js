@@ -81,8 +81,8 @@ class MidiViewer {
 
   // ------------------------------------------------------------
   // BPM auto sur la sélection (même formule que LoopViewerMusicMath)
-//  (à appeler depuis l’extérieur si tu veux l’exploiter)
-// ------------------------------------------------------------
+  // (à appeler depuis l’extérieur si tu veux l’exploiter)
+  // ------------------------------------------------------------
   getAutoBpm(measures, beatsPerMeasure) {
     return this.math.getAutoBpm(
       this.loopStart,
@@ -101,8 +101,7 @@ class MidiViewer {
   }
 
   // ------------------------------------------------------------
-  // interactions (si jamais tu les appelles via UIManager)
-//  UIManager appelle déjà this.midiViewer.interaction.* → OK aussi
+  // interactions
   // ------------------------------------------------------------
   mousePressed() {
     if (!this.active) return;
@@ -126,7 +125,7 @@ class MidiViewer {
 
   // ------------------------------------------------------------
   // playhead externe (si tu veux le synchroniser à l’audio)
-//  time = secondes absolues dans le fichier MIDI
+  // time = secondes absolues dans le fichier MIDI
   // ------------------------------------------------------------
   setPlayhead(time) {
     const tNorm = this.duration > 0 ? time / this.duration : 0;

@@ -121,8 +121,8 @@ class MidiViewerInteraction {
 
   // ------------------------------------------------------------
   // ZOOM / PAN (molette)
-//  (équivalent onWheel du LoopViewerInteraction)
-// ------------------------------------------------------------
+  // (équivalent onWheel du LoopViewerInteraction)
+  // ------------------------------------------------------------
   onWheel(delta) {
     const v = this.v;
 

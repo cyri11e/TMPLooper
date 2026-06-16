@@ -132,7 +132,7 @@ class MidiViewerRenderer {
   // ------------------------------------------------------------
   // INFOS : nom du fichier + durée totale + durée sélection
   // ------------------------------------------------------------
-  drawInfo() {
+drawInfo() {
     const v = this.v;
     if (!v.filename) return;
 
@@ -145,14 +145,20 @@ class MidiViewerRenderer {
     const mmS = floor(selDur / 60);
     const ssS = floor(selDur % 60);
 
-    const txt =
-      `${v.filename}   |   Total: ${mmT}:${nf(ssT,2)}   |   Sélection: ${mmS}:${nf(ssS,2)}`;
+    // BPM auto (si mesures connues)
+    let bpmTxt = "--";
+    const bpm = v.getAutoBpm(1, 4); // 1 mesure, 4 temps
+    if (bpm) bpmTxt = bpm.toFixed(2);
 
+    const txt =
+      `${v.filename}   |   Total: ${mmT}:${nf(ssT,2)}   |   Sélection: ${mmS}:${nf(ssS,2)}   |   BPM auto: ${bpmTxt}`;
+console.log(txt)
     push();
     fill(200);
     textSize(12);
     textAlign(LEFT, TOP);
     text(txt, v.x, v.y + v.h + 6);
     pop();
-  }
+}
+
 }
