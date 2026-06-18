@@ -19,12 +19,16 @@ class LoopViewerRenderer {
     noStroke();
     rect(0, 0, v.w, v.h);
 
+
+    // texte double‑clic
+    this._drawHint();
+
     // beats
     this.drawBeats();
 
     // beats détectés (crans magnétiques visibles)
     if (this.v.analyzer) {
-        this.v.analyzer.drawBeatMarkers(this);
+      this.v.analyzer.drawBeatMarkers(this);
     }
 
     // waveform adaptatif
@@ -36,7 +40,7 @@ class LoopViewerRenderer {
     // poignées réelles
     this.drawHandles();
 
-    // poignées fixes évidées
+    // poignées fixes (snap) — visuel seulement
     this.drawFixedWindowHandles();
 
     // playhead
@@ -48,8 +52,24 @@ class LoopViewerRenderer {
     this.drawSelectionInfo();
   }
 
+
+
   // ------------------------------------------------------------
-  // Waveform adaptatif (un seul mode)
+  // Texte double‑clic
+  // ------------------------------------------------------------
+  _drawHint() {
+    const v = this.v;
+
+    push();
+    fill(255, 180);
+    textAlign(CENTER, TOP);
+    textSize(14);
+    text("Double‑clic pour ouvrir un fichier audio", v.w / 2, 4);
+    pop();
+  }
+
+  // ------------------------------------------------------------
+  // Waveform adaptatif
   // ------------------------------------------------------------
   drawWaveformAdaptive() {
     const v = this.v;
@@ -131,7 +151,7 @@ class LoopViewerRenderer {
   }
 
   // ------------------------------------------------------------
-  // Poignées réelles (loopStart / loopEnd)
+  // Poignées réelles
   // ------------------------------------------------------------
   drawHandles() {
     const v = this.v;
@@ -150,24 +170,32 @@ class LoopViewerRenderer {
   }
 
   // ------------------------------------------------------------
-  // Poignées fixes évidées (snap)
+  // Poignées fixes (snap) — crochets visuels uniquement
   // ------------------------------------------------------------
   drawFixedWindowHandles() {
     const v = this.v;
 
-    const snapW = 12;
-    const snapH = 24;
-    const snapY = v.h/2 - snapH/2;
+    const snapY = 4;
 
-    stroke(255, 200, 0);
-    strokeWeight(2);
-    noFill();
+    // crochet gauche
+    push();
+    fill(255, 200, 0);
+    noStroke();
+    textSize(22);
+    textAlign(LEFT, TOP);
+    text("[", 6, snapY - 2);
+    pop();
 
-    // gauche
-    rect(2, snapY, snapW, snapH, 3);
+    // crochet droit
+    push();
+    fill(255, 200, 0);
+    noStroke();
+    textSize(22);
+    textAlign(RIGHT, TOP);
+    text("]", v.w - 6, snapY - 2);
+    pop();
 
-    // droite
-    rect(v.w - snapW - 2, snapY, snapW, snapH, 3);
+    // AUCUN RECTANGLE → plus de poignée blanche
   }
 
   // ------------------------------------------------------------
@@ -202,7 +230,7 @@ class LoopViewerRenderer {
 
     const beatDur = selDur / beats;
 
-    stroke(255, 180, 0, 120);
+    stroke("cyan");
     strokeWeight(1);
 
     for (let i = 1; i < beats; i++) {

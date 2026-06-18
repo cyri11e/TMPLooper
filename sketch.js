@@ -6,10 +6,20 @@
 let app;
 
 function setup() {
-  createCanvas(1000, 700);
+  createCanvas(windowWidth, windowHeight);
+
   app = new AppController();
   app.init();
+
+  // indispensable pour placer correctement le LoopViewer
+  app.ui.onResize();
 }
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  app.ui.onResize();
+}
+
 
 function draw() {
   if (!app) return;
@@ -27,6 +37,6 @@ function mouseWheel(e)   { if (app) return app.mouseWheel(e); }
 function keyPressed() {
   if (!app) return;
   app.keyPressed(key, keyCode);
-
-
 }
+
+

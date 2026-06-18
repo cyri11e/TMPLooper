@@ -150,6 +150,18 @@ class LoopViewer {
     if (!this.active) return;
     this.interaction.onWheel(delta);
   }
+  
+  onResize() {
+    // proportions du layout — UNE SEULE SOURCE DE VÉRITÉ
+    this.x = width * 0.05;
+    this.y = height * 0.05;   // ← calé en haut
+    this.w = width * 0.90;
+    this.h = height * 0.40;
+
+    // clamp offset après resize
+    const maxOffset = this.w * this.zoom - this.w;
+    this.offset = constrain(this.offset, 0, maxOffset);
+  }
 
   // ------------------------------------------------------------
   // playhead externe (AudioEngine)

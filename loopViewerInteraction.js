@@ -1,316 +1,267 @@
 // ------------------------------------------------------------
 // LoopViewerInteraction.js — Version complète
-// - Poignées réelles prioritaires
-// - Poignées fixes (snap) hitbox strictes
-// - Pan toujours fonctionnel
-// - Snap intelligent sur beats détectés
-// - Flèches ← → = beat précédent / suivant
-// - Flèches ↑ ↓ = déplacement d’une mesure complète
 // ------------------------------------------------------------
 
 class LoopViewerInteraction {
-    constructor(viewer) {
-        this.v = viewer;
+  constructor(viewer) {
+    this.v = viewer;
 
-        this.dragging = false;
-        this.dragLeft = false;
-        this.dragRight = false;
-        this.dragSelection = false;
-        this.dragPan = false;
+    this.dragging = false;
+    this.dragLeft = false;
+    this.dragRight = false;
+    this.dragSelection = false;
+    this.dragPan = false;
 
-        this.lastX = 0;
-        this.selStart = 0;
-        this.selEnd = 0;
+    this.lastX = 0;
+    this.selStart = 0;
+    this.selEnd = 0;
+  }
+
+  // ------------------------------------------------------------
+  // UTILITAIRES BEATS
+  // ------------------------------------------------------------
+  _findNextBeat(pos, beats) {
+    for (const b of beats) {
+      if (b > pos) return b;
+    }
+    return beats[beats.length - 1];
+  }
+
+  _findPrevBeat(pos, beats) {
+    for (let i = beats.length - 1; i >= 0; i--) {
+      if (beats[i] < pos) return beats[i];
+    }
+    return beats[0];
+  }
+
+  _moveSelectionToBeat(targetBeat) {
+    const v = this.v;
+    const beats = v.analyzer.beatMarkers;
+
+    const span = v.loopEnd - v.loopStart;
+    const start = targetBeat;
+
+    const theoreticalEnd = start + span;
+
+    let end = beats[0];
+    let bestDist = Math.abs(beats[0] - theoreticalEnd);
+
+    for (const b of beats) {
+      const d = Math.abs(b - theoreticalEnd);
+      if (d < bestDist) {
+        bestDist = d;
+        end = b;
+      }
     }
 
-    // ------------------------------------------------------------
-    // UTILITAIRES BEATS
-    // ------------------------------------------------------------
-    _findNextBeat(pos, beats) {
-        for (const b of beats) {
-            if (b > pos) return b;
-        }
-        return beats[beats.length - 1];
+    v.loopStart = start;
+    v.loopEnd   = end;
+
+    const visibleStart = v.offset / (v.w * v.zoom);
+    const visibleEnd   = (v.offset + v.w) / (v.w * v.zoom);
+
+    if (v.loopStart < visibleStart) {
+      v.offset = v.loopStart * v.w * v.zoom;
+    } else if (v.loopEnd > visibleEnd) {
+      v.offset = v.loopEnd * v.w * v.zoom - v.w;
     }
 
-    _findPrevBeat(pos, beats) {
-        for (let i = beats.length - 1; i >= 0; i--) {
-            if (beats[i] < pos) return beats[i];
-        }
-        return beats[0];
+    if (v.updateAutoBpm) v.updateAutoBpm();
+  }
+
+  // ------------------------------------------------------------
+  // CLAVIER
+  // ------------------------------------------------------------
+  keyPressed() {
+    const v = this.v;
+    if (!v.analyzer) return;
+
+    const beats = v.analyzer.beatMarkers;
+    if (!beats || beats.length === 0) return;
+
+    const pos = v.loopStart;
+
+    if (keyCode === RIGHT_ARROW) {
+      const next = this._findNextBeat(pos, beats);
+      this._moveSelectionToBeat(next);
+      if (v.updateAutoBpm) v.updateAutoBpm();
+      return;
     }
 
-    _moveSelectionToBeat(targetBeat) {
-        const v = this.v;
-        const beats = v.analyzer.beatMarkers;
-
-        // 1) Durée actuelle de la sélection
-        const span = v.loopEnd - v.loopStart;
-
-        // 2) Nouveau début = beat détecté
-        const start = targetBeat;
-
-        // 3) Position théorique de fin
-        const theoreticalEnd = start + span;
-
-        // 4) Trouver le beat détecté le plus proche de theoreticalEnd
-        let end = beats[0];
-        let bestDist = Math.abs(beats[0] - theoreticalEnd);
-
-        for (const b of beats) {
-            const d = Math.abs(b - theoreticalEnd);
-            if (d < bestDist) {
-                bestDist = d;
-                end = b;
-            }
-        }
-
-        // 5) Appliquer
-        v.loopStart = start;
-        v.loopEnd   = end;
-
-        // 6) Recentrer la vue si la sélection sort de l'écran
-        const visibleStart = v.offset / (v.w * v.zoom);
-        const visibleEnd   = (v.offset + v.w) / (v.w * v.zoom);
-
-        if (v.loopStart < visibleStart) {
-            v.offset = v.loopStart * v.w * v.zoom;
-        } else if (v.loopEnd > visibleEnd) {
-            v.offset = v.loopEnd * v.w * v.zoom - v.w;
-        }
-
-        // 7) Mettre à jour le BPM auto
-        if (v.updateAutoBpm) v.updateAutoBpm();
+    if (keyCode === LEFT_ARROW) {
+      const prev = this._findPrevBeat(pos, beats);
+      this._moveSelectionToBeat(prev);
+      if (v.updateAutoBpm) v.updateAutoBpm();
+      return;
     }
 
+    if (keyCode === UP_ARROW) {
+      const N = v.renderer.bpmControls.beatsPerMeasure;
+      let target = pos;
 
+      for (let i = 0; i < N; i++) {
+        target = this._findNextBeat(target, beats);
+      }
 
-    // ------------------------------------------------------------
-    // CLAVIER
-    // ------------------------------------------------------------
-    keyPressed() {
-        const v = this.v;
-        if (!v.analyzer) return;
-
-        const beats = v.analyzer.beatMarkers;
-        if (!beats || beats.length === 0) return;
-
-        const pos = v.loopStart;
-
-        // → Flèche droite : beat suivant
-        if (keyCode === RIGHT_ARROW) {
-            const next = this._findNextBeat(pos, beats);
-            this._moveSelectionToBeat(next);
-            if (v.updateAutoBpm) v.updateAutoBpm();
-
-            return;
-        }
-
-        // ← Flèche gauche : beat précédent
-        if (keyCode === LEFT_ARROW) {
-            const prev = this._findPrevBeat(pos, beats);
-            this._moveSelectionToBeat(prev);
-            if (v.updateAutoBpm) v.updateAutoBpm();
-
-            return;
-        }
-
-        // ↑ Flèche haut : +1 mesure (N beats)
-        if (keyCode === UP_ARROW) {
-            const N = v.renderer.bpmControls.beatsPerMeasure;
-            let target = pos;
-
-            for (let i = 0; i < N; i++) {
-                target = this._findNextBeat(target, beats);
-            }
-
-            this._moveSelectionToBeat(target);
-            if (v.updateAutoBpm) v.updateAutoBpm();
-
-            return;
-        }
-
-        // ↓ Flèche bas : -1 mesure (N beats)
-        if (keyCode === DOWN_ARROW) {
-            const N = v.renderer.bpmControls.beatsPerMeasure;
-            let target = pos;
-
-            for (let i = 0; i < N; i++) {
-                target = this._findPrevBeat(target, beats);
-            }
-
-            this._moveSelectionToBeat(target);
-            if (v.updateAutoBpm) v.updateAutoBpm();
-
-            return;
-        }
+      this._moveSelectionToBeat(target);
+      if (v.updateAutoBpm) v.updateAutoBpm();
+      return;
     }
 
-    // ------------------------------------------------------------
-    // SOURIS
-    // ------------------------------------------------------------
-    mousePressed() {
-        const v = this.v;
-        if (!v.active) return;
-        if (!v.isHovered()) return;
+    if (keyCode === DOWN_ARROW) {
+      const N = v.renderer.bpmControls.beatsPerMeasure;
+      let target = pos;
 
-        const localX = mouseX - v.x;
-        const localY = mouseY - v.y;
-        this.lastX = mouseX;
+      for (let i = 0; i < N; i++) {
+        target = this._findPrevBeat(target, beats);
+      }
 
-        const leftX  = v.loopStart * v.w * v.zoom - v.offset;
-        const rightX = v.loopEnd   * v.w * v.zoom - v.offset;
+      this._moveSelectionToBeat(target);
+      if (v.updateAutoBpm) v.updateAutoBpm();
+      return;
+    }
+  }
 
-        // --------------------------------------------------------
-        // 1) POIGNÉES RÉELLES (PRIORITAIRES)
-        // --------------------------------------------------------
-        if (abs(localX - leftX) < 12) {
-            this.dragLeft = true;
-            this.dragging = true;
-            return;
-        }
+  // ------------------------------------------------------------
+  // SOURIS
+  // ------------------------------------------------------------
+  mousePressed() {
+    const v = this.v;
+    if (!v.active) return;
+    if (!v.isHovered()) return;
 
-        if (abs(localX - rightX) < 12) {
-            this.dragRight = true;
-            this.dragging = true;
-            return;
-        }
+    const localX = mouseX - v.x;
+    const localY = mouseY - v.y;
+    this.lastX = mouseX;
 
-        // --------------------------------------------------------
-        // 2) POIGNÉES DE SNAP (hitbox stricte 12x24)
-        // --------------------------------------------------------
-        const snapW = 12;
-        const snapH = 24;
-        const snapY = v.h/2 - snapH/2;
+    const leftX  = v.loopStart * v.w * v.zoom - v.offset;
+    const rightX = v.loopEnd   * v.w * v.zoom - v.offset;
 
-        // gauche
-        if (localX >= 0 && localX <= snapW &&
-            localY >= snapY && localY <= snapY + snapH) {
+    // 1) Poignées réelles
+    if (abs(localX - leftX) < 12) {
+      this.dragLeft = true;
+      this.dragging = true;
+      return;
+    }
 
-            const visibleStart = v.offset / (v.w * v.zoom);
-            const visibleEnd   = (v.offset + v.w) / (v.w * v.zoom);
+    if (abs(localX - rightX) < 12) {
+      this.dragRight = true;
+      this.dragging = true;
+      return;
+    }
 
-            v.loopStart = visibleStart;
-            v.loopEnd   = visibleEnd;
-            return;
-        }
+    // 2) Poignées de snap (hitbox stricte 12x24) — DÉPLACÉES EN HAUT
+    const snapW = 12;
+    const snapH = 24;
+    const snapY = 4; // au lieu de v.h/2 - snapH/2
 
-        // droite
-        if (localX >= v.w - snapW && localX <= v.w &&
-            localY >= snapY && localY <= snapY + snapH) {
+    if (localX >= 0 && localX <= snapW &&
+        localY >= snapY && localY <= snapY + snapH) {
 
-            const visibleStart = v.offset / (v.w * v.zoom);
-            const visibleEnd   = (v.offset + v.w) / (v.w * v.zoom);
+      const visibleStart = v.offset / (v.w * v.zoom);
+      const visibleEnd   = (v.offset + v.w) / (v.w * v.zoom);
 
-            v.loopStart = visibleStart;
-            v.loopEnd   = visibleEnd;
-            return;
-        }
+      v.loopStart = visibleStart;
+      v.loopEnd   = visibleEnd;
+      return;
+    }
 
-        // --------------------------------------------------------
-        // 3) CLIC DANS LA SÉLECTION
-        // --------------------------------------------------------
-        if (localX > leftX && localX < rightX) {
+    if (localX >= v.w - snapW && localX <= v.w &&
+        localY >= snapY && localY <= snapY + snapH) {
 
-            // SHIFT = déplacer la sélection
-            if (keyIsDown(SHIFT)) {
-                this.dragSelection = true;
-                this.dragging = true;
-                this.selStart = v.loopStart;
-                this.selEnd   = v.loopEnd;
-                return;
-            }
+      const visibleStart = v.offset / (v.w * v.zoom);
+      const visibleEnd   = (v.offset + v.w) / (v.w * v.zoom);
 
-            // Sinon = PAN
-            this.dragPan = true;
-            this.dragging = true;
-            return;
-        }
+      v.loopStart = visibleStart;
+      v.loopEnd   = visibleEnd;
+      return;
+    }
 
-        // --------------------------------------------------------
-        // 4) Sinon → PAN
-        // --------------------------------------------------------
-        this.dragPan = true;
+    // 3) Clic dans la sélection
+    if (localX > leftX && localX < rightX) {
+      if (keyIsDown(SHIFT)) {
+        this.dragSelection = true;
         this.dragging = true;
+        this.selStart = v.loopStart;
+        this.selEnd   = v.loopEnd;
+        return;
+      }
+
+      this.dragPan = true;
+      this.dragging = true;
+      return;
     }
 
-    // ------------------------------------------------------------
-    mouseDragged() {
-        const v = this.v;
-        if (!this.dragging) return;
+    // 4) Sinon → pan
+    this.dragPan = true;
+    this.dragging = true;
+  }
 
-        const dx = mouseX - this.lastX;
-        this.lastX = mouseX;
+  // ------------------------------------------------------------
+  mouseDragged() {
+    const v = this.v;
+    if (!this.dragging) return;
 
-        // PAN
-        if (this.dragPan) {
-            v.offset -= dx;
-            v.offset = constrain(v.offset, 0, v.w * v.zoom - v.w);
-            return;
-        }
+    const dx = mouseX - this.lastX;
+    this.lastX = mouseX;
 
-        // poignée gauche
-        if (this.dragLeft) {
-            let t = (mouseX - v.x + v.offset) / (v.w * v.zoom);
-
-            // snap intelligent
-            //if (v.analyzer) t = v.analyzer.snapToBeat(t);
-
-            v.loopStart = constrain(t, 0, v.loopEnd - 0.001);
-            if (v.updateAutoBpm) v.updateAutoBpm();
-
-            return;
-        }
-
-        // poignée droite
-        if (this.dragRight) {
-            let t = (mouseX - v.x + v.offset) / (v.w * v.zoom);
-
-            // snap intelligent
-            // if (v.analyzer) t = v.analyzer.snapToBeat(t);
-
-            v.loopEnd = constrain(t, v.loopStart + 0.001, 1);
-            if (v.updateAutoBpm) v.updateAutoBpm();
-
-            return;
-        }
-
-        // déplacement de la sélection (SHIFT)
-        if (this.dragSelection) {
-            const deltaNorm = dx / (v.w * v.zoom);
-            let ns = this.selStart + deltaNorm;
-            let ne = this.selEnd   + deltaNorm;
-
-            const span = ne - ns;
-
-            if (ns < 0) { ns = 0; ne = span; }
-            if (ne > 1) { ne = 1; ns = 1 - span; }
-
-            v.loopStart = ns;
-            v.loopEnd   = ne;
-        }
+    if (this.dragPan) {
+      v.offset -= dx;
+      v.offset = constrain(v.offset, 0, v.w * v.zoom - v.w);
+      return;
     }
 
-    // ------------------------------------------------------------
-    mouseReleased() {
-        this.dragging = false;
-        this.dragLeft = false;
-        this.dragRight = false;
-        this.dragSelection = false;
-        this.dragPan = false;
+    if (this.dragLeft) {
+      let t = (mouseX - v.x + v.offset) / (v.w * v.zoom);
+      // if (v.analyzer) t = v.analyzer.snapToBeat(t);
+      v.loopStart = constrain(t, 0, v.loopEnd - 0.001);
+      if (v.updateAutoBpm) v.updateAutoBpm();
+      return;
     }
 
-    // ------------------------------------------------------------
-    onWheel(delta) {
-        const v = this.v;
-
-        const localX = mouseX - v.x;
-        const timeBefore = (localX + v.offset) / (v.w * v.zoom);
-
-        v.zoom *= (1 - delta * 0.0012);
-        v.zoom = constrain(v.zoom, 0.2, 200);
-
-        v.offset = timeBefore * v.w * v.zoom - localX;
-        v.offset = constrain(v.offset, 0, v.w * v.zoom - v.w);
+    if (this.dragRight) {
+      let t = (mouseX - v.x + v.offset) / (v.w * v.zoom);
+      // if (v.analyzer) t = v.analyzer.snapToBeat(t);
+      v.loopEnd = constrain(t, v.loopStart + 0.001, 1);
+      if (v.updateAutoBpm) v.updateAutoBpm();
+      return;
     }
+
+    if (this.dragSelection) {
+      const deltaNorm = dx / (v.w * v.zoom);
+      let ns = this.selStart + deltaNorm;
+      let ne = this.selEnd   + deltaNorm;
+
+      const span = ne - ns;
+
+      if (ns < 0) { ns = 0; ne = span; }
+      if (ne > 1) { ne = 1; ns = 1 - span; }
+
+      v.loopStart = ns;
+      v.loopEnd   = ne;
+    }
+  }
+
+  // ------------------------------------------------------------
+  mouseReleased() {
+    this.dragging = false;
+    this.dragLeft = false;
+    this.dragRight = false;
+    this.dragSelection = false;
+    this.dragPan = false;
+  }
+
+  // ------------------------------------------------------------
+  onWheel(delta) {
+    const v = this.v;
+
+    const localX = mouseX - v.x;
+    const timeBefore = (localX + v.offset) / (v.w * v.zoom);
+
+    v.zoom *= (1 - delta * 0.0012);
+    v.zoom = constrain(v.zoom, 0.2, 200);
+
+    v.offset = timeBefore * v.w * v.zoom - localX;
+    v.offset = constrain(v.offset, 0, v.w * v.zoom - v.w);
+  }
 }

@@ -1,5 +1,5 @@
 // ------------------------------------------------------------
-// RecManager.js — gestion du countdown + enregistrement auto
+// RecManager.js — version nettoyée (sans MIDI Viewer)
 // ------------------------------------------------------------
 
 class RecManager {
@@ -32,9 +32,6 @@ class RecManager {
         (ui.loopViewer.loopEnd - ui.loopViewer.loopStart) *
         audio.buffer.duration;
     }
-    else if (ui.midiViewer.active && ui.midiViewer.duration > 0) {
-      loopDuration = ui.midiViewer.duration;
-    }
 
     // MODE FANTOM : pas d'audio chargé
     this.fantomMode = !audio.buffer;
@@ -42,7 +39,7 @@ class RecManager {
     if (this.fantomMode) {
       const bpm = this.app.midi.clockBpm || ui.bpmControls.bpm;
       const measures = ui.bpmControls.measures;
-      loopDuration = (60 / bpm) * measures * 4; // 1 mesure = 4 temps
+      loopDuration = (60 / bpm) * measures * 4;
     }
 
     if (loopDuration <= 0.01) return;
@@ -58,13 +55,6 @@ class RecManager {
     this.countdownStart = millis();
     this.isCountdown = true;
     this.isRecording = false;
-
-    if (ui.loopViewer.active && this.app.midi.isPlayingMidi) {
-      this.app.midi.stopMidiPlayback?.();
-    }
-    if (ui.midiViewer.active && audio.isPlaying) {
-      audio.stop();
-    }
 
     this._scheduleClicks();
   }
@@ -130,7 +120,7 @@ class RecManager {
     if (this.fantomMode) {
       const bpm = this.app.midi.clockBpm || ui.bpmControls.bpm;
       const measures = ui.bpmControls.measures;
-      loopDuration = (60 / bpm) * measures * 4; // 1 mesure = 4 temps
+      loopDuration = (60 / bpm) * measures * 4;
     }
     else if (ui.loopViewer.active && audio.buffer) {
       const measures = ui.bpmControls.measures;
@@ -143,9 +133,6 @@ class RecManager {
 
       const bpmAuto = 60 * measures * 4 / loopDuration;
       ui.bpmControls.bpm = bpmAuto;
-    }
-    else if (ui.midiViewer.active) {
-      loopDuration = ui.midiViewer.duration;
     }
 
     this.recordEndTime = this.recordStartTime + loopDuration;
@@ -234,7 +221,7 @@ class RecManager {
 
       this.isRecording = false;
 
-      this.app.ui.midiViewer.setActive(true);
+      // Réactive uniquement le LoopViewer audio
       this.app.ui.loopViewer.setActive(true);
 
       if (!this.fantomMode && audio.buffer) {
@@ -258,8 +245,6 @@ class RecManager {
           (ui.loopViewer.loopEnd - ui.loopViewer.loopStart) *
           audioBuf.duration;
         theoDur = loopBase * measures;
-      } else if (ui.midiViewer.active) {
-        theoDur = ui.midiViewer.duration;
       }
 
       const fmt = (sec) => {

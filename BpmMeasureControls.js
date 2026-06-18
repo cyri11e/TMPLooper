@@ -1,23 +1,46 @@
 // ------------------------------------------------------------
-// BpmMeasureControls.js — BPM + Mesures + Beats
-// Version stable : clic unique, aucun spam
+// BpmMeasureControls.js — Aligné + Responsive (Mode A 45/10/45)
 // ------------------------------------------------------------
 
 class BpmMeasureControls {
   constructor(app, x, y) {
     this.app = app;
-
-    // On garde x,y pour BPM et Beats
     this.x = x;
     this.y = y;
 
-    this.bpm = 120.00;
-    this.measures = 4;
-    this.beatsPerMeasure = 4;
+    this.width = 330;
+    this.height = 60;
 
     this.activeField = null;
-    this.buttons = {};
-    this._lastClick = 0;
+
+    this.bpm = 120.00;
+    this.beat = 4;
+    this.measures = 4;
+
+    // hitzones
+    this.bpmMinus = null;
+    this.bpmPlus = null;
+    this.beatMinus = null;
+    this.beatPlus = null;
+    this.measuresMinus = null;
+    this.measuresPlus = null;
+  }
+
+  // ------------------------------------------------------------
+  // RESPONSIVE
+  // ------------------------------------------------------------
+  onResize() {
+    const W = width;
+    const H = height;
+
+    // scale uniforme basé sur 960x390 (comme ton pédalier)
+    const s = Math.min(W / 960, H / 390);
+    this.s = s;
+
+    this.width = 700 * s;   // largeur totale du bloc
+    this.height = 55 * s;
+
+    this.x = (W - this.width) / 2;
   }
 
   // ------------------------------------------------------------
@@ -27,170 +50,112 @@ class BpmMeasureControls {
     push();
     translate(this.x, this.y);
 
-    // ------------------------------------------------------------
-    // BPM (inchangé)
-    // ------------------------------------------------------------
-    fill(255);
-    textSize(14);
-    textAlign(LEFT, CENTER);
-    text("BPM", 0, 0);
+    const s = this.s;
 
-    const bpmToShow =
-      (!this.app.audio.isPlaying && this.app.midi.clockBpm)
-        ? this.app.midi.clockBpm
-        : this.bpm;
-
-    const bpmBox = { x: 40, y: -10, w: 70, h: 22 };
-    this.buttons["bpmBox"] = {
-      x: this.x + bpmBox.x,
-      y: this.y + bpmBox.y,
-      w: bpmBox.w,
-      h: bpmBox.h
-    };
-
-    stroke(200);
-    fill(this.activeField === "bpm" ? 70 : 40);
-    rect(bpmBox.x, bpmBox.y, bpmBox.w, bpmBox.h, 4);
-
-    fill(255);
-    noStroke();
     textAlign(CENTER, CENTER);
-    text(nf(bpmToShow, 0, 2), bpmBox.x + bpmBox.w / 2, bpmBox.y + bpmBox.h / 2);
-
-    this._drawBtn("bpmMinus", 120, -10, 22, 22, "-");
-    this._drawBtn("bpmPlus", 150, -10, 22, 22, "+");
-
-    // ------------------------------------------------------------
-    // MESURES — déplacé sous RECORD (y = 150)
-    // ------------------------------------------------------------
-    const MES_Y = 620 - this.y; // offset relatif
-
+    textStyle(BOLD);
+    textSize(22 * s);
     fill(255);
-    textAlign(LEFT, CENTER);
-    text("Mesures", 0, MES_Y);
 
-    fill(255);
-    textAlign(CENTER, CENTER);
-    text(this.measures, 70, MES_Y);
+    // espacement horizontal
+    const gap = this.width / 3;
 
-    this._drawBtn("measMinus", 100, MES_Y - 10, 22, 22, "-");
-    this._drawBtn("measPlus", 130, MES_Y - 10, 22, 22, "+");
+    // positions des 3 blocs
+    const x1 = gap * 0.5;
+    const x2 = gap * 1.5;
+    const x3 = gap * 2.5;
 
-    // ------------------------------------------------------------
-    // BEATS (inchangé)
-    // ------------------------------------------------------------
-    fill(255);
-    textAlign(LEFT, CENTER);
-    text("Beat", 180, 0);
+    // --- BPM ---
+    text(`BPM ${this.bpm.toFixed(2)}`, x1, 0);
+    this._drawButtons(x1, 25 * s, "bpm");
 
-    fill(255);
-    textAlign(CENTER, CENTER);
-    text(this.beatsPerMeasure, 240, 0);
+    // --- Beat ---
+    text(`Beat ${this.beat}`, x2, 0);
+    this._drawButtons(x2, 25 * s, "beat");
 
-    this._drawBtn("beatMinus", 270, -10, 22, 22, "-");
-    this._drawBtn("beatPlus", 300, -10, 22, 22, "+");
+    // --- Mesures ---
+    text(`Mesures ${this.measures}`, x3, 0);
+    this._drawButtons(x3, 25 * s, "measures");
 
     pop();
+
+    // Mise à jour des hitzones après translation
+    this._updateHitboxes();
   }
 
   // ------------------------------------------------------------
-  // DRAW BUTTON
+  // DRAW BUTTONS
   // ------------------------------------------------------------
-  _drawBtn(id, x, y, w, h, label) {
-    const hovered =
-      mouseX > this.x + x &&
-      mouseX < this.x + x + w &&
-      mouseY > this.y + y &&
-      mouseY < this.y + y + h;
+  _drawButtons(cx, cy, type) {
+    const s = this.s;
+    const bw = 28 * s;
+    const bh = 22 * s;
+    const pad = 6 * s;
 
-    fill(hovered ? 100 : 60);
+    // bouton -
+    fill(60);
     stroke(200);
-    rect(x, y, w, h, 4);
-
+    rect(cx - bw - pad, cy, bw, bh, 4);
     fill(255);
-    noStroke();
-    textAlign(CENTER, CENTER);
-    text(label, x + w / 2, y + h / 2);
+    text("-", cx - bw - pad + bw / 2, cy + bh / 2);
 
-    this.buttons[id] = {
-      x: this.x + x,
-      y: this.y + y,
-      w,
-      h
-    };
+    // bouton +
+    fill(60);
+    stroke(200);
+    rect(cx + pad, cy, bw, bh, 4);
+    fill(255);
+    text("+", cx + pad + bw / 2, cy + bh / 2);
+  }
+
+  // ------------------------------------------------------------
+  // HITBOXES
+  // ------------------------------------------------------------
+  _updateHitboxes() {
+    const s = this.s;
+
+    const gap = this.width / 3;
+    const x1 = this.x + gap * 0.5;
+    const x2 = this.x + gap * 1.5;
+    const x3 = this.x + gap * 2.5;
+
+    const cy = this.y + 25 * s;
+    const bw = 28 * s;
+    const bh = 22 * s;
+    const pad = 6 * s;
+
+    this.bpmMinus = { x: x1 - bw - pad, y: cy, w: bw, h: bh };
+    this.bpmPlus  = { x: x1 + pad,      y: cy, w: bw, h: bh };
+
+    this.beatMinus = { x: x2 - bw - pad, y: cy, w: bw, h: bh };
+    this.beatPlus  = { x: x2 + pad,      y: cy, w: bw, h: bh };
+
+    this.measuresMinus = { x: x3 - bw - pad, y: cy, w: bw, h: bh };
+    this.measuresPlus  = { x: x3 + pad,      y: cy, w: bw, h: bh };
   }
 
   // ------------------------------------------------------------
   // INTERACTIONS
   // ------------------------------------------------------------
   mousePressed() {
-    const now = millis();
-    if (now - this._lastClick < 150) return;
-    this._lastClick = now;
+    const mx = mouseX;
+    const my = mouseY;
 
-    if (this._inside("bpmBox")) {
-      if (!this.app.audio.isPlaying && this.app.midi.clockBpm) {
-        this.activeField = null;
-      } else {
-        this.activeField = "bpm";
-      }
-      return;
-    }
+    const check = (box) =>
+      mx > box.x && mx < box.x + box.w && my > box.y && my < box.h;
 
-    this.activeField = null;
+    if (check(this.bpmMinus)) this.bpm = Math.max(20, this.bpm - 1);
+    if (check(this.bpmPlus))  this.bpm = Math.min(300, this.bpm + 1);
 
-    if (this._inside("bpmMinus")) return this._changeBpm(-0.10);
-    if (this._inside("bpmPlus")) return this._changeBpm(+0.10);
+    if (check(this.beatMinus)) this.beat = Math.max(1, this.beat - 1);
+    if (check(this.beatPlus))  this.beat = Math.min(16, this.beat + 1);
 
-    if (this._inside("measMinus")) return this._changeMeasures(-1);
-    if (this._inside("measPlus")) return this._changeMeasures(+1);
-
-    if (this._inside("beatMinus")) return this._changeBeats(-1);
-    if (this._inside("beatPlus")) return this._changeBeats(+1);
+    if (check(this.measuresMinus)) this.measures = Math.max(1, this.measures - 1);
+    if (check(this.measuresPlus))  this.measures = Math.min(64, this.measures + 1);
   }
 
   keyPressed(k) {
     if (this.activeField === "bpm") {
-      if ((k >= "0" && k <= "9") || k === ".") {
-        this.bpm = Number(String(this.bpm) + k);
-      }
-      if (k === "Backspace") {
-        let s = String(this.bpm);
-        s = s.slice(0, -1);
-        this.bpm = Number(s || "0");
-      }
-      this.bpm = Number(this.bpm.toFixed(2));
-    }
-  }
-
-  // ------------------------------------------------------------
-  // HELPERS
-  // ------------------------------------------------------------
-  _inside(id) {
-    const b = this.buttons[id];
-    if (!b) return false;
-    return (
-      mouseX >= b.x &&
-      mouseX <= b.x + b.w &&
-      mouseY >= b.y &&
-      mouseY <= b.y + b.h
-    );
-  }
-
-  _changeBpm(delta) {
-    this.bpm = constrain(this.bpm + delta, 20, 300);
-    this.bpm = Number(this.bpm.toFixed(2));
-  }
-
-  _changeMeasures(delta) {
-    this.measures = constrain(this.measures + delta, 1, 32);
-  }
-
-  _changeBeats(delta) {
-    this.beatsPerMeasure = constrain(this.beatsPerMeasure + delta, 1, 16);
-
-    if (this.app.ui && this.app.ui.loopViewer && this.app.ui.loopViewer.updateAutoBpm) {
-      this.app.ui.loopViewer.updateAutoBpm();
+      if (!isNaN(k)) this.bpm = parseFloat((this.bpm + k).toFixed(2));
     }
   }
 }

@@ -68,7 +68,6 @@ class AudioEngine {
 
     this.isPlaying = true;
     lv.setActive(true);
-    this.app.ui.midiViewer.setActive(false);
   }
 
   // ------------------------------------------------------------
@@ -83,7 +82,6 @@ class AudioEngine {
     this.isPlaying = false;
 
     this.app.ui.loopViewer.setActive(true);
-    this.app.ui.midiViewer.setActive(true);
   }
 
   // ------------------------------------------------------------
